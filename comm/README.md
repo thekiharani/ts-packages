@@ -4,6 +4,8 @@ TypeScript/JavaScript SDK for Onfon SMS and Meta WhatsApp messaging.
 
 Node `>=20` is required.
 
+Designed for Node.js services, workers, and serverless messaging flows.
+
 ## Install
 
 ```bash
