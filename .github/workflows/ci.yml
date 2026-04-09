@@ -48,28 +48,28 @@ jobs:
                   "path": "logger",
                   "publish_node": "24",
                   "tag_prefix": "logger",
-                  "test_node": "24",
+                  "test_nodes": ["24", "25"],
               },
               {
                   "name": "@noria/mailer",
                   "path": "mailer",
                   "publish_node": "24",
                   "tag_prefix": "mailer",
-                  "test_node": "24",
+                  "test_nodes": ["24", "25"],
               },
               {
                   "name": "@noria/payments",
                   "path": "noriapay",
                   "publish_node": "24",
                   "tag_prefix": "payments",
-                  "test_node": "18",
+                  "test_nodes": ["20", "22", "24", "25"],
               },
               {
                   "name": "@noria/storage",
                   "path": "storage",
                   "publish_node": "24",
                   "tag_prefix": "storage",
-                  "test_node": "24",
+                  "test_nodes": ["24", "25"],
               },
           ]
           shared_paths = {
@@ -111,7 +111,7 @@ jobs:
 
           changed_files = event_files()
           if any(path in shared_paths for path in changed_files):
-              test_matrix = packages
+              selected_test_packages = packages
           else:
               changed_paths: set[str] = set()
               for changed_file in changed_files:
@@ -119,7 +119,14 @@ jobs:
                       path = package["path"]
                       if changed_file == path or changed_file.startswith(f"{path}/"):
                           changed_paths.add(path)
-              test_matrix = [package for package in packages if package["path"] in changed_paths]
+              selected_test_packages = [package for package in packages if package["path"] in changed_paths]
+
+          test_matrix = []
+          for package in selected_test_packages:
+              for test_node in package["test_nodes"]:
+                  matrix_entry = dict(package)
+                  matrix_entry["test_node"] = test_node
+                  test_matrix.append(matrix_entry)
 
           release_matrix = []
           for package in packages:

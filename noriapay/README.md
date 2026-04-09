@@ -64,7 +64,7 @@ npm install @noria/payments
 
 ## Runtime
 
-- Node.js `>=18`
+- Node.js `>=20`
 - ESM package output
 - Uses global `fetch` by default
 - You can inject your own `fetch` implementation if needed

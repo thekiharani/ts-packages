@@ -26,7 +26,7 @@
     }
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public",
@@ -36,8 +36,8 @@
     "build": "tsup src/index.ts src/mpesa.ts src/sasapay.ts --format esm --dts --sourcemap --clean --target es2022 --out-dir dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/test.mjs",
-    "test:run": "npm run build && node --test tests/**/*.test.mjs",
-    "test:coverage": "npm run build && c8 --reporter=text node --test tests/**/*.test.mjs",
+    "test:run": "npm run build && node scripts/run-node-tests.mjs",
+    "test:coverage": "npm run build && c8 --reporter=text node scripts/run-node-tests.mjs",
     "prepublishOnly": "npm run typecheck && npm run test:run"
   },
   "keywords": [
