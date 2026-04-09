@@ -1,0 +1,10 @@
+{
+  "name": "noria-ts",
+  "private": true,
+  "workspaces": [
+    "logger",
+    "mailer",
+    "noriapay",
+    "storage"
+  ]
+}
