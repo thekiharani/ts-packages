@@ -498,7 +498,7 @@ function buildPresignedPutHeaders(input: PutObjectCommandInput): Record<string, 
   }
 
   for (const [key, value] of Object.entries(input.Metadata ?? {})) {
-    headers[`x-amz-meta-${key}`] = value;
+    headers[`x-amz-meta-${key}`] = String(value);
   }
 
   return headers;

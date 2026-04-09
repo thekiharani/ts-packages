@@ -30,7 +30,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/test.mjs",
     "test:run": "npm run build && node scripts/run-node-tests.mjs",
-    "test:coverage": "npm run build && c8 --all --src dist --reporter=text --check-coverage --lines 100 --functions 100 --branches 100 node scripts/run-node-tests.mjs",
+    "test:coverage": "npm run build && c8 --all --src dist --exclude scripts/** --reporter=text --check-coverage --lines 100 --functions 100 --branches 100 node scripts/run-node-tests.mjs",
     "prepublishOnly": "npm run typecheck && npm run test:coverage"
   },
   "keywords": [
