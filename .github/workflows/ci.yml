@@ -159,7 +159,26 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ matrix.package.path }}
+        env:
+          npm_config_include: optional
         run: npm ci
+
+      - name: Ensure Rollup native binary is present
+        if: runner.os == 'Linux'
+        working-directory: ${{ matrix.package.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROLLUP_VERSION=$(node -e "const lock=require('./package-lock.json'); process.stdout.write(lock.packages?.['node_modules/rollup']?.version ?? '')")
+          if [ -z "${ROLLUP_VERSION}" ]; then
+            exit 0
+          fi
+
+          if node -e "try { require.resolve('@rollup/rollup-linux-x64-gnu'); process.exit(0); } catch { process.exit(1); }"; then
+            exit 0
+          fi
+
+          npm install --no-save --ignore-scripts "@rollup/rollup-linux-x64-gnu@${ROLLUP_VERSION}"
 
       - name: Run typecheck
         working-directory: ${{ matrix.package.path }}
