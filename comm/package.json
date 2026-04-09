@@ -36,6 +36,15 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thekiharani/ts-packages.git",
+    "directory": "comm"
+  },
+  "homepage": "https://github.com/thekiharani/ts-packages/tree/main/comm#readme",
+  "bugs": {
+    "url": "https://github.com/thekiharani/ts-packages/issues"
+  },
   "scripts": {
     "build": "tsup src/index.ts src/sms.ts src/whatsapp.ts src/webhooks.ts --format esm --dts --sourcemap --clean --target es2022 --out-dir dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",

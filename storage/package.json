@@ -25,6 +25,15 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thekiharani/ts-packages.git",
+    "directory": "storage"
+  },
+  "homepage": "https://github.com/thekiharani/ts-packages/tree/main/storage#readme",
+  "bugs": {
+    "url": "https://github.com/thekiharani/ts-packages/issues"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --sourcemap --clean --target node20 --out-dir dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
