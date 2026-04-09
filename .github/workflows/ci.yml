@@ -366,6 +366,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          for _ in $(seq 1 10); do
+            if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
             echo "Release already exists for ${TAG_NAME}"
           else
