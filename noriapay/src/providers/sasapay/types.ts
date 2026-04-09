@@ -7,6 +7,7 @@ import type {
   ProviderRequestOptions,
   RetryPolicy,
 } from "../../core/types";
+import type { EnvLike } from "../../core/config";
 
 interface SasaPayBaseClientOptions {
   environment?: NoriapayEnvironment;
@@ -33,6 +34,12 @@ interface SasaPayExternalTokenAuthOptions {
 
 export type SasaPayClientOptions = SasaPayBaseClientOptions &
   (SasaPayCredentialAuthOptions | SasaPayExternalTokenAuthOptions);
+
+export interface SasaPayFromEnvOptions extends SasaPayBaseClientOptions {
+  prefix?: string;
+  env?: EnvLike;
+  tokenProvider?: AccessTokenProvider;
+}
 
 export interface SasaPayRequestOptions extends ProviderRequestOptions {}
 

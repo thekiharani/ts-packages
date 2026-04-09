@@ -75,11 +75,11 @@ export type {
   StorageUrlStyle,
 } from "./types";
 
-const DEFAULT_S3_REGION = "us-east-1";
-const DEFAULT_R2_REGION = "auto";
-const DEFAULT_UPLOAD_EXPIRES_IN = 900;
-const DEFAULT_DOWNLOAD_EXPIRES_IN = 3_600;
-const MAX_PRESIGN_EXPIRES_IN = 604_800;
+export const DEFAULT_S3_REGION = "us-east-1";
+export const DEFAULT_R2_REGION = "auto";
+export const DEFAULT_UPLOAD_EXPIRES_IN = 900;
+export const DEFAULT_DOWNLOAD_EXPIRES_IN = 3_600;
+export const MAX_PRESIGN_EXPIRES_IN = 604_800;
 
 export class StorageClient {
   readonly bucket: string;

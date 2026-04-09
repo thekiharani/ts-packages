@@ -1,6 +1,7 @@
 import { ConfigurationError } from "../../core/errors";
 import { ClientCredentialsTokenProvider } from "../../core/oauth";
 import { HttpClient } from "../../core/http";
+import { getEnvEnvironment, getEnvNumber, getOptionalEnv, getRequiredEnv } from "../../core/config";
 import { formatTimestamp, toAmountString } from "../../core/utils";
 import type {
   MpesaRequestOptions,
@@ -10,6 +11,7 @@ import type {
   MpesaB2CRequest,
   MpesaC2BRegisterVersion,
   MpesaClientOptions,
+  MpesaFromEnvOptions,
   MpesaQrCodeRequest,
   MpesaRegisterC2BUrlsRequest,
   MpesaReversalRequest,
@@ -19,7 +21,7 @@ import type {
   MpesaTransactionStatusRequest,
 } from "./types";
 
-const MPESA_BASE_URLS = {
+export const MPESA_BASE_URLS = {
   sandbox: "https://sandbox.safaricom.co.ke",
   production: "https://api.safaricom.co.ke",
 } as const;
@@ -40,6 +42,31 @@ export function buildMpesaStkPassword(input: {
 }
 
 export class MpesaClient {
+  static fromEnv(options: MpesaFromEnvOptions = {}): MpesaClient {
+    const prefix = options.prefix ?? "MPESA_";
+    const env = options.env;
+
+    return new MpesaClient({
+      environment: getEnvEnvironment(`${prefix}ENVIRONMENT`, env),
+      baseUrl: options.baseUrl ?? getOptionalEnv(`${prefix}BASE_URL`, env),
+      fetch: options.fetch,
+      timeoutMs: options.timeoutMs ?? getEnvNumber(`${prefix}TIMEOUT_SECONDS`, env),
+      tokenCacheSkewMs:
+        options.tokenCacheSkewMs ?? (getEnvNumber(`${prefix}TOKEN_CACHE_SKEW_SECONDS`, env) ?? 60) * 1000,
+      defaultHeaders: options.defaultHeaders,
+      retry: options.retry,
+      hooks: options.hooks,
+      ...(options.tokenProvider
+        ? {
+            tokenProvider: options.tokenProvider,
+          }
+        : {
+            consumerKey: getRequiredEnv(`${prefix}CONSUMER_KEY`, env),
+            consumerSecret: getRequiredEnv(`${prefix}CONSUMER_SECRET`, env),
+          }),
+    });
+  }
+
   private readonly http: HttpClient;
   private readonly tokens: { getAccessToken(forceRefresh?: boolean): Promise<string> };
 

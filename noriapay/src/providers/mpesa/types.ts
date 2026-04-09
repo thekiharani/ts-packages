@@ -7,6 +7,7 @@ import type {
   ProviderRequestOptions,
   RetryPolicy,
 } from "../../core/types";
+import type { EnvLike } from "../../core/config";
 
 interface MpesaBaseClientOptions {
   environment?: NoriapayEnvironment;
@@ -33,6 +34,12 @@ interface MpesaExternalTokenAuthOptions {
 
 export type MpesaClientOptions = MpesaBaseClientOptions &
   (MpesaCredentialAuthOptions | MpesaExternalTokenAuthOptions);
+
+export interface MpesaFromEnvOptions extends MpesaBaseClientOptions {
+  prefix?: string;
+  env?: EnvLike;
+  tokenProvider?: AccessTokenProvider;
+}
 
 export interface MpesaRequestOptions extends ProviderRequestOptions {}
 

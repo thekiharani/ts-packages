@@ -1,13 +1,14 @@
 # `@noria/payments`
 
-Reusable TypeScript/JavaScript SDK for Kenyan payment providers.
+Reusable TypeScript/JavaScript SDK for M-PESA Daraja, SasaPay, and Paystack payments.
 
 Current provider support:
 
 - M-PESA Daraja
 - SasaPay
+- Paystack
 
-This package is provider-first. It gives you dedicated clients for each API instead of forcing both providers into a lossy normalized abstraction too early.
+This package is provider-first. It gives you dedicated clients for each API instead of forcing providers into a lossy normalized abstraction too early.
 
 Request payloads are strongly typed at compile time, but this first package cut does not perform full runtime schema validation of provider payloads. The SDK sends the payload object you provide after its internal normalization steps such as amount string conversion.
 
@@ -31,6 +32,13 @@ Implemented now:
 - SasaPay B2C
 - SasaPay B2B
 - SasaPay callback and IPN payload types
+- Paystack transaction initialize and verify
+- Paystack bank listing
+- Paystack account resolution
+- Paystack transfer recipient creation
+- Paystack transfer initiation, finalization, and verification
+- Environment-based client construction with `fromEnv()`
+- Paystack webhook signature and source-IP verification helpers
 
 Not implemented yet:
 
@@ -50,6 +58,9 @@ This SDK was implemented against:
 - SasaPay C2B: <https://developer.sasapay.app/docs/apis/c2b>
 - SasaPay B2C: <https://developer.sasapay.app/docs/apis/b2c>
 - SasaPay B2B: <https://developer.sasapay.app/docs/apis/b2b>
+- Paystack API reference: <https://paystack.com/docs/api/>
+- Paystack transfer recipients: <https://paystack.com/docs/transfers/creating-transfer-recipients/>
+- Paystack webhooks: <https://paystack.com/docs/payments/webhooks/>
 
 Important SasaPay note:
 
@@ -79,7 +90,9 @@ import {
   AuthenticationError,
   ClientCredentialsTokenProvider,
   ConfigurationError,
+  PaystackClient,
   TimeoutError,
+  WebhookVerificationError,
 } from "@noria/payments";
 ```
 
@@ -87,6 +100,7 @@ Provider subpath exports:
 
 ```ts
 import { MpesaClient, buildMpesaStkPassword, buildMpesaTimestamp } from "@noria/payments/mpesa";
+import { PaystackClient } from "@noria/payments/paystack";
 import { SasaPayClient } from "@noria/payments/sasapay";
 ```
 
@@ -147,11 +161,27 @@ const response = await sasapay.requestPayment({
 });
 ```
 
+### Paystack
+
+```ts
+import { PaystackClient } from "@noria/payments/paystack";
+
+const paystack = PaystackClient.fromEnv();
+
+const response = await paystack.initializeTransaction({
+  amount: 5000,
+  email: "customer@example.com",
+  currency: "KES",
+  reference: "INV-001",
+  callback_url: "https://example.com/paystack/callback",
+});
+```
+
 ## Shared Design
 
 ### Authentication
 
-By default, each provider client manages OAuth client-credentials tokens internally.
+By default, `MpesaClient` and `SasaPayClient` manage OAuth client-credentials tokens internally. `PaystackClient` uses your secret key directly as the bearer credential.
 
 You can also inject your own token provider:
 
@@ -169,13 +199,29 @@ When a custom `tokenProvider` is supplied:
 - credentials like `consumerKey` or `clientId` are not required
 - you remain responsible for token freshness
 
+### Environment Configuration
+
+All three provider clients support `fromEnv()`:
+
+```ts
+const mpesa = MpesaClient.fromEnv();
+const sasapay = SasaPayClient.fromEnv();
+const paystack = PaystackClient.fromEnv();
+```
+
+Supported environment variables:
+
+- M-PESA: `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_ENVIRONMENT`, `MPESA_BASE_URL`, `MPESA_TIMEOUT_SECONDS`, `MPESA_TOKEN_CACHE_SKEW_SECONDS`
+- SasaPay: `SASAPAY_CLIENT_ID`, `SASAPAY_CLIENT_SECRET`, `SASAPAY_ENVIRONMENT`, `SASAPAY_BASE_URL`, `SASAPAY_TIMEOUT_SECONDS`, `SASAPAY_TOKEN_CACHE_SKEW_SECONDS`
+- Paystack: `PAYSTACK_SECRET_KEY`, `PAYSTACK_BASE_URL`, `PAYSTACK_TIMEOUT_SECONDS`
+
 ### Amount Normalization
 
 For request payloads that contain `Amount`, the SDK accepts `string | number` and serializes numbers to strings before sending the HTTP request.
 
 ### Async Payment Behavior
 
-For both providers, many payment APIs are asynchronous.
+Across all providers, many payment APIs are asynchronous.
 
 Treat the initial API response as:
 
@@ -199,7 +245,7 @@ This SDK is configurable at three levels:
 
 ### Constructor Options
 
-Shared transport-style options available on both clients:
+Shared transport-style options available on all clients:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -207,7 +253,7 @@ Shared transport-style options available on both clients:
 | `baseUrl` | `string` | Provider default | Override the full provider base URL. |
 | `fetch` | `typeof fetch` | global `fetch` | Inject a custom fetch implementation. |
 | `timeoutMs` | `number` | `undefined` | Default timeout for all requests in milliseconds. |
-| `tokenCacheSkewMs` | `number` | `60000` | Refresh OAuth tokens slightly before expiry. |
+| `tokenCacheSkewMs` | `number` | `60000` | Refresh OAuth tokens slightly before expiry. Used by OAuth-backed clients only. |
 | `defaultHeaders` | `HeadersInit` | `undefined` | Headers added to every request. |
 | `retry` | `RetryPolicy \| false` | `undefined` | Default retry policy for all requests. |
 | `hooks` | `HttpHooks` | `undefined` | Request, response, and error hooks. |
@@ -231,6 +277,14 @@ Use one of:
 | --- | --- |
 | Built-in OAuth | `clientId`, `clientSecret` |
 | External token provider | `tokenProvider` |
+
+### `PaystackClient` auth
+
+Required fields:
+
+| Auth mode | Required fields |
+| --- | --- |
+| Secret key | `secretKey` |
 
 ### SasaPay Production
 
@@ -363,6 +417,7 @@ The package throws structured error classes:
 | `AuthenticationError` | Token acquisition failed. |
 | `TimeoutError` | Request timeout elapsed. |
 | `ApiError` | Non-2xx provider response. |
+| `WebhookVerificationError` | Paystack webhook signature or source-IP verification failed. |
 | `NoriapayError` | Base class for package-specific errors. |
 
 ### `ApiError`
@@ -801,6 +856,47 @@ Shared callback shape for SasaPay B2C and B2B-style transfer result payloads.
 | `MerchantAccountBalance` | `string` |
 | `LinkedTransactionCode` | `string` optional |
 
+## Paystack
+
+### Base URL
+
+- default: `https://api.paystack.co`
+- override with `baseUrl` or `PAYSTACK_BASE_URL`
+
+### Paystack Client Methods
+
+| Method | Endpoint |
+| --- | --- |
+| `initializeTransaction(request, options?)` | `POST /transaction/initialize` |
+| `verifyTransaction(reference, options?)` | `GET /transaction/verify/{reference}` |
+| `listBanks(query?, options?)` | `GET /bank` |
+| `resolveAccount({ accountNumber, bankCode }, options?)` | `GET /bank/resolve` |
+| `createTransferRecipient(request, options?)` | `POST /transferrecipient` |
+| `initiateTransfer(request, options?)` | `POST /transfer` |
+| `finalizeTransfer(request, options?)` | `POST /transfer/finalize_transfer` |
+| `verifyTransfer(reference, options?)` | `GET /transfer/verify/{reference}` |
+
+### Paystack Notes
+
+- amounts are lowest-unit integers, so `5000` means `50.00` in a 2-decimal currency such as KES
+- `accessToken` in per-request options overrides the bearer secret key for one request
+- Paystack does not use OAuth token lookup in this SDK
+
+### Verify Paystack Webhooks
+
+```ts
+import {
+  PAYSTACK_WEBHOOK_IPS,
+  requirePaystackSignature,
+  requireSourceIp,
+} from "@noria/payments";
+
+export function verifyPaystackWebhook(rawBody, signature, sourceIp) {
+  requirePaystackSignature(rawBody, signature, process.env.PAYSTACK_SECRET_KEY!);
+  requireSourceIp(sourceIp, PAYSTACK_WEBHOOK_IPS);
+}
+```
+
 ## Usage Patterns
 
 ### Use the SDK-managed token flow
@@ -859,7 +955,6 @@ This is the first package cut. Expect additive growth in:
 
 - more provider endpoints
 - richer response typing
-- helper utilities for webhook verification and payload validation
 - more provider-specific modules
 
 Breaking changes should be reserved for places where the current first-cut API is too weak or misleading.

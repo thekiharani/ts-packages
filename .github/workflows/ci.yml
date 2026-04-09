@@ -43,7 +43,14 @@ jobs:
           import subprocess
 
           packages = [
-              {
+                {
+                  "name": "@noria/comm",
+                  "path": "comm",
+                  "publish_node": "24",
+                  "tag_prefix": "comm",
+                  "test_nodes": ["20", "22", "24"],
+                },
+                {
                   "name": "@noria/logger",
                   "path": "logger",
                   "publish_node": "24",

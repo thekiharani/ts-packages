@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import StorageClient, {
+  DEFAULT_DOWNLOAD_EXPIRES_IN,
+  DEFAULT_R2_REGION,
+  DEFAULT_S3_REGION,
+  DEFAULT_UPLOAD_EXPIRES_IN,
+  MAX_PRESIGN_EXPIRES_IN,
   StorageError,
   createStorageClient,
   joinStorageKey,
@@ -42,6 +47,14 @@ test("StorageError stores metadata with and without an explicit cause", () => {
 
 test("joinStorageKey normalizes repeated separators and arrays", () => {
   assert.equal(joinStorageKey(" invoices/ ", ["2026", "/march/"], "statement.pdf"), "invoices/2026/march/statement.pdf");
+});
+
+test("default storage constants are exported", () => {
+  assert.equal(DEFAULT_S3_REGION, "us-east-1");
+  assert.equal(DEFAULT_R2_REGION, "auto");
+  assert.equal(DEFAULT_UPLOAD_EXPIRES_IN, 900);
+  assert.equal(DEFAULT_DOWNLOAD_EXPIRES_IN, 3600);
+  assert.equal(MAX_PRESIGN_EXPIRES_IN, 604800);
 });
 
 test("constructor applies default provider, region, URL style, and TTLs", () => {

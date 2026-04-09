@@ -9,7 +9,7 @@ Supported destinations:
 - `file`
 - `cloudwatch`
 
-Node `24+` is required.
+Node `>=20` is required.
 
 ## Install
 

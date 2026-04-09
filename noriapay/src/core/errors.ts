@@ -31,6 +31,13 @@ export class AuthenticationError extends NoriapayError {
   }
 }
 
+export class WebhookVerificationError extends NoriapayError {
+  constructor(message: string, options?: { cause?: unknown; details?: unknown }) {
+    super(message, { ...options, code: "WEBHOOK_VERIFICATION_ERROR" });
+    this.name = "WebhookVerificationError";
+  }
+}
+
 export class ApiError extends NoriapayError {
   readonly status: number;
   readonly responseBody?: unknown;

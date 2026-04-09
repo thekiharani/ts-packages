@@ -2,7 +2,7 @@
 
 Configurable object storage client for S3-compatible providers, with first-class support for AWS S3 and Cloudflare R2.
 
-Node `24+` is required.
+Node `>=20` is required.
 
 ## Install
 
@@ -23,6 +23,11 @@ npm install @noria/storage
 
 ```ts
 import StorageClient, {
+  DEFAULT_DOWNLOAD_EXPIRES_IN,
+  DEFAULT_R2_REGION,
+  DEFAULT_S3_REGION,
+  DEFAULT_UPLOAD_EXPIRES_IN,
+  MAX_PRESIGN_EXPIRES_IN,
   StorageError,
   createStorageClient,
   joinStorageKey,
@@ -32,6 +37,7 @@ import StorageClient, {
 - `StorageClient` is the main class and the default export
 - `createStorageClient(options)` is a convenience wrapper around `new StorageClient(options)`
 - `joinStorageKey(...parts)` normalizes storage keys the same way the client does
+- `DEFAULT_S3_REGION`, `DEFAULT_R2_REGION`, `DEFAULT_UPLOAD_EXPIRES_IN`, `DEFAULT_DOWNLOAD_EXPIRES_IN`, and `MAX_PRESIGN_EXPIRES_IN` expose the package defaults
 - `StorageError` is the package error type for wrapped operation failures
 
 Useful exported types include:

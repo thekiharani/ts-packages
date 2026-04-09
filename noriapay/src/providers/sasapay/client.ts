@@ -1,6 +1,7 @@
 import { ConfigurationError } from "../../core/errors";
 import { HttpClient } from "../../core/http";
 import { ClientCredentialsTokenProvider } from "../../core/oauth";
+import { getEnvEnvironment, getEnvNumber, getOptionalEnv, getRequiredEnv } from "../../core/config";
 import { toAmountString } from "../../core/utils";
 import type {
   SasaPayB2BRequest,
@@ -8,6 +9,7 @@ import type {
   SasaPayB2CRequest,
   SasaPayB2CResponse,
   SasaPayClientOptions,
+  SasaPayFromEnvOptions,
   SasaPayProcessPaymentRequest,
   SasaPayProcessPaymentResponse,
   SasaPayRequestOptions,
@@ -15,9 +17,34 @@ import type {
   SasaPayRequestPaymentResponse,
 } from "./types";
 
-const SASAPAY_SANDBOX_BASE_URL = "https://sandbox.sasapay.app/api/v1";
+export const SASAPAY_BASE_URL = "https://sandbox.sasapay.app/api/v1";
 
 export class SasaPayClient {
+  static fromEnv(options: SasaPayFromEnvOptions = {}): SasaPayClient {
+    const prefix = options.prefix ?? "SASAPAY_";
+    const env = options.env;
+
+    return new SasaPayClient({
+      environment: getEnvEnvironment(`${prefix}ENVIRONMENT`, env),
+      baseUrl: options.baseUrl ?? getOptionalEnv(`${prefix}BASE_URL`, env),
+      fetch: options.fetch,
+      timeoutMs: options.timeoutMs ?? getEnvNumber(`${prefix}TIMEOUT_SECONDS`, env),
+      tokenCacheSkewMs:
+        options.tokenCacheSkewMs ?? (getEnvNumber(`${prefix}TOKEN_CACHE_SKEW_SECONDS`, env) ?? 60) * 1000,
+      defaultHeaders: options.defaultHeaders,
+      retry: options.retry,
+      hooks: options.hooks,
+      ...(options.tokenProvider
+        ? {
+            tokenProvider: options.tokenProvider,
+          }
+        : {
+            clientId: getRequiredEnv(`${prefix}CLIENT_ID`, env),
+            clientSecret: getRequiredEnv(`${prefix}CLIENT_SECRET`, env),
+          }),
+    });
+  }
+
   private readonly http: HttpClient;
   private readonly tokens: { getAccessToken(forceRefresh?: boolean): Promise<string> };
 
@@ -90,7 +117,7 @@ function resolveBaseUrl(options: SasaPayClientOptions): string {
   }
 
   if ((options.environment ?? "sandbox") === "sandbox") {
-    return SASAPAY_SANDBOX_BASE_URL;
+    return SASAPAY_BASE_URL;
   }
 
   throw new ConfigurationError(

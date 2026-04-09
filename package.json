@@ -2,6 +2,7 @@
   "name": "noria-ts",
   "private": true,
   "workspaces": [
+    "comm",
     "logger",
     "mailer",
     "noriapay",
