@@ -1,6 +1,6 @@
 {
   "name": "@norialabs/payments",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reusable TypeScript/JavaScript SDK for M-PESA Daraja, SasaPay, and Paystack payments.",
   "type": "module",
   "sideEffects": false,
