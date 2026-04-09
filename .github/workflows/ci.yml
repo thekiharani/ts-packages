@@ -117,16 +117,19 @@ jobs:
 
 
           changed_files = event_files()
-          if any(path in shared_paths for path in changed_files):
+          changed_paths: set[str] = set()
+          for changed_file in changed_files:
+              for package in packages:
+                  path = package["path"]
+                  if changed_file == path or changed_file.startswith(f"{path}/"):
+                      changed_paths.add(path)
+
+          if changed_paths:
+              selected_test_packages = [package for package in packages if package["path"] in changed_paths]
+          elif any(path in shared_paths for path in changed_files):
               selected_test_packages = packages
           else:
-              changed_paths: set[str] = set()
-              for changed_file in changed_files:
-                  for package in packages:
-                      path = package["path"]
-                      if changed_file == path or changed_file.startswith(f"{path}/"):
-                          changed_paths.add(path)
-              selected_test_packages = [package for package in packages if package["path"] in changed_paths]
+              selected_test_packages = []
 
           test_matrix = []
           for package in selected_test_packages:
@@ -188,7 +191,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROLLUP_VERSION=$(node -e "const lock=require('./package-lock.json'); process.stdout.write(lock.packages?.['node_modules/rollup']?.version ?? '')")
+          ROLLUP_VERSION=$(node -e "const path=require('node:path'); const lock=require(path.resolve(process.env.GITHUB_WORKSPACE, 'package-lock.json')); process.stdout.write(lock.packages?.['node_modules/rollup']?.version ?? '')")
           if [ -z "${ROLLUP_VERSION}" ]; then
             exit 0
           fi
