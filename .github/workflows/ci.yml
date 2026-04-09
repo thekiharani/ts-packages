@@ -265,16 +265,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE_VERSION=$(python3 - <<'PY'
+          read -r BASE_VERSION PUBLISHED_VERSION <<< "$(python3 - <<'PY'
           from pathlib import Path
           import json
           import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
 
           path = Path(os.environ["PACKAGE_PATH"]) / "package.json"
           data = json.loads(path.read_text())
-          print(data["version"])
+          base_version = data["version"]
+
+          package_name = os.environ["PACKAGE_NAME"]
+          package_name_quoted = urllib.parse.quote(package_name, safe="")
+          published_version = ""
+
+          try:
+            with urllib.request.urlopen(
+              f"https://registry.npmjs.org/{package_name_quoted}/latest",
+              timeout=10,
+            ) as response:
+              latest = json.load(response)
+              published_version = str(latest.get("version", ""))
+          except urllib.error.HTTPError as error:
+            if error.code != 404:
+              raise
+
+          print(base_version, published_version)
           PY
-          )
+          )"
 
           IFS='.' read -r MAJOR MINOR BASE_PATCH <<< "${BASE_VERSION}"
           LINE_TAG_PREFIX="${TAG_PREFIX}-v${MAJOR}.${MINOR}."
@@ -285,6 +306,25 @@ jobs:
           if [ -n "${HEAD_LINE_TAG}" ]; then
             echo "version=${HEAD_LINE_TAG#${TAG_PREFIX}-v}" >> "$GITHUB_OUTPUT"
             echo "tag_name=${HEAD_LINE_TAG}" >> "$GITHUB_OUTPUT"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -n "${PUBLISHED_VERSION}" ] && [ "${PUBLISHED_VERSION}" = "${BASE_VERSION}" ]; then
+            TAG_NAME="${TAG_PREFIX}-v${PUBLISHED_VERSION}"
+            if git rev-parse -q --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
+              echo "Published version ${PUBLISHED_VERSION} already has a git tag on a different commit."
+              exit 1
+            fi
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "${TAG_NAME}"
+            git push origin "${TAG_NAME}"
+
+            echo "version=${PUBLISHED_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -315,6 +355,7 @@ jobs:
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         env:
@@ -341,6 +382,7 @@ jobs:
           git checkout "${TAG_NAME}"
 
       - name: Setup Node
+        if: steps.release.outputs.should_publish == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.package.publish_node }}
@@ -348,15 +390,18 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Prepare package version
+        if: steps.release.outputs.should_publish == 'true'
         working-directory: ${{ matrix.package.path }}
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
+        if: steps.release.outputs.should_publish == 'true'
         working-directory: ${{ matrix.package.path }}
         run: npm ci
 
       - name: Publish to npm
+        if: steps.release.outputs.should_publish == 'true'
         working-directory: ${{ matrix.package.path }}
         run: npm publish
