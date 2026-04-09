@@ -48,28 +48,28 @@ jobs:
                   "path": "logger",
                   "publish_node": "24",
                   "tag_prefix": "logger",
-                  "test_nodes": ["24", "25"],
+                  "test_nodes": ["20", "22", "24"],
               },
               {
                   "name": "@noria/mailer",
                   "path": "mailer",
                   "publish_node": "24",
                   "tag_prefix": "mailer",
-                  "test_nodes": ["24", "25"],
+                  "test_nodes": ["20", "22", "24"],
               },
               {
                   "name": "@noria/payments",
                   "path": "noriapay",
                   "publish_node": "24",
                   "tag_prefix": "payments",
-                  "test_nodes": ["20", "22", "24", "25"],
+                  "test_nodes": ["20", "22", "24"],
               },
               {
                   "name": "@noria/storage",
                   "path": "storage",
                   "publish_node": "24",
                   "tag_prefix": "storage",
-                  "test_nodes": ["24", "25"],
+                  "test_nodes": ["20", "22", "24"],
               },
           ]
           shared_paths = {
