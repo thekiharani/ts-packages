@@ -312,20 +312,17 @@ jobs:
 
           if [ -n "${PUBLISHED_VERSION}" ] && [ "${PUBLISHED_VERSION}" = "${BASE_VERSION}" ]; then
             TAG_NAME="${TAG_PREFIX}-v${PUBLISHED_VERSION}"
-            if git rev-parse -q --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
-              echo "Published version ${PUBLISHED_VERSION} already has a git tag on a different commit."
-              exit 1
+            if ! git rev-parse -q --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git tag "${TAG_NAME}"
+              git push origin "${TAG_NAME}"
+
+              echo "version=${PUBLISHED_VERSION}" >> "$GITHUB_OUTPUT"
+              echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+              echo "should_publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
-
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag "${TAG_NAME}"
-            git push origin "${TAG_NAME}"
-
-            echo "version=${PUBLISHED_VERSION}" >> "$GITHUB_OUTPUT"
-            echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
           fi
 
           LATEST_LINE_TAG=$(git tag -l "${LINE_TAG_PREFIX}*" --sort=-v:refname | head -n 1)
