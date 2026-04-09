@@ -72,7 +72,12 @@ jobs:
                   "test_node": "24",
               },
           ]
-          shared_paths = {"package.json", "package-lock.json"}
+          shared_paths = {
+              ".github/CODEOWNERS",
+              ".github/workflows/ci.yml",
+              "package.json",
+              "package-lock.json",
+          }
 
 
           def git_lines(*args: str) -> list[str]:
