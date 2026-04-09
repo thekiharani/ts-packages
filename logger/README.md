@@ -1,4 +1,4 @@
-# `@noria/logger`
+# `@norialabs/logger`
 
 Structured JSON logging for Node.js services, built on `pino`.
 
@@ -14,7 +14,7 @@ Node `>=20` is required.
 ## Install
 
 ```bash
-npm install @noria/logger
+npm install @norialabs/logger
 ```
 
 ## Recommended Deployment Model
@@ -29,7 +29,7 @@ Use direct `cloudwatch` delivery only when the application must own log shipping
 ## Quick Start
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "payments",
@@ -111,7 +111,7 @@ Structured payload example:
 ### `stdout`
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "api",
@@ -123,7 +123,7 @@ const managedLogger = createServiceLogger({
 ### `stderr`
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "worker",
@@ -134,7 +134,7 @@ const managedLogger = createServiceLogger({
 ### Fixed File Path
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "mailer",
@@ -150,7 +150,7 @@ const managedLogger = createServiceLogger({
 ### Rotated File Paths
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "batch",
@@ -177,7 +177,7 @@ That resolves to paths like:
 ### CloudWatch With Rotating Streams
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "conversations",
@@ -207,7 +207,7 @@ By default, rotating CloudWatch streams with a configured `prefix` resolve to `p
 ### CloudWatch With Explicit AWS Credentials
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "billing",
@@ -233,7 +233,7 @@ If `credentials` is omitted, the AWS SDK credential chain is used as-is.
 ### CloudWatch With Retention
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "billing",
@@ -263,7 +263,7 @@ Important:
 ### Multiple Destinations
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "worker",
@@ -280,7 +280,7 @@ const managedLogger = createServiceLogger({
 ### Custom Schema
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "api",
@@ -315,7 +315,7 @@ This emits records like:
 ### Custom Identity
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "worker",
@@ -347,7 +347,7 @@ jobs-2026-03-27-replica-a
 ### Redaction Modes
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "api",
@@ -492,7 +492,7 @@ api-2026-03-27-worker-a
 ### Custom Resolver
 
 ```ts
-import { createServiceLogger, formatDateStamp } from "@noria/logger";
+import { createServiceLogger, formatDateStamp } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "api",
@@ -611,7 +611,7 @@ The logger redacts common secret-like keys by default, including:
 Add extra keys like this:
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "conversations",
@@ -636,7 +636,7 @@ const managedLogger = createServiceLogger({
 For env-driven config:
 
 ```ts
-import { parseLoggerDestinations, parseLoggerRedactKeys } from "@noria/logger";
+import { parseLoggerDestinations, parseLoggerRedactKeys } from "@norialabs/logger";
 
 const destinations = parseLoggerDestinations(process.env.LOG_DESTINATIONS);
 const redactKeys = parseLoggerRedactKeys(process.env.LOG_REDACT_KEYS);
@@ -645,7 +645,7 @@ const redactKeys = parseLoggerRedactKeys(process.env.LOG_REDACT_KEYS);
 ## Graceful Shutdown
 
 ```ts
-import { createServiceLogger } from "@noria/logger";
+import { createServiceLogger } from "@norialabs/logger";
 
 const managedLogger = createServiceLogger({
   serviceName: "payments",

@@ -1,5 +1,5 @@
 {
-  "name": "@noria/comm",
+  "name": "@norialabs/comm",
   "version": "0.1.0",
   "description": "Reusable TypeScript/JavaScript SDK for Onfon SMS and Meta WhatsApp messaging.",
   "type": "module",

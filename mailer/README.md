@@ -1,4 +1,4 @@
-# `@noria/mailer`
+# `@norialabs/mailer`
 
 Official JavaScript SDK for the Noria Mailer API.
 
@@ -9,13 +9,13 @@ Node `24+` is required. Use it in server-side Node.js and Next.js code, not in b
 ## Install
 
 ```bash
-npm install @noria/mailer
+npm install @norialabs/mailer
 ```
 
 ## Quick Start
 
 ```ts
-import { Mailer } from "@noria/mailer";
+import { Mailer } from "@norialabs/mailer";
 
 const mailer = new Mailer(process.env.NORIA_MAILER_API_KEY!, {
   baseUrl: "https://mailer.example.com",
@@ -567,7 +567,7 @@ Special behavior:
 ## Error Handling
 
 ```ts
-import { Mailer, MailerError } from "@noria/mailer";
+import { Mailer, MailerError } from "@norialabs/mailer";
 
 try {
   await mailer.emails.send({

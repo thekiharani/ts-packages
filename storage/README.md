@@ -1,4 +1,4 @@
-# `@noria/storage`
+# `@norialabs/storage`
 
 Configurable object storage client for S3-compatible providers, with first-class support for AWS S3 and Cloudflare R2.
 
@@ -7,7 +7,7 @@ Node `>=20` is required.
 ## Install
 
 ```bash
-npm install @noria/storage
+npm install @norialabs/storage
 ```
 
 ## What This Package Gives You
@@ -31,7 +31,7 @@ import StorageClient, {
   StorageError,
   createStorageClient,
   joinStorageKey,
-} from "@noria/storage";
+} from "@norialabs/storage";
 ```
 
 - `StorageClient` is the main class and the default export
@@ -66,7 +66,7 @@ Useful exported types include:
 ## Quick Start
 
 ```ts
-import { StorageClient } from "@noria/storage";
+import { StorageClient } from "@norialabs/storage";
 
 const storage = new StorageClient({
   bucket: "documents",
@@ -114,12 +114,12 @@ Resolution rules:
 
 ## Credentials, Clients, And AWS Overrides
 
-The storage client exposes the same kind of credential override surface that `@noria/logger` exposes for CloudWatch.
+The storage client exposes the same kind of credential override surface that `@norialabs/logger` exposes for CloudWatch.
 
 ### Explicit S3 credentials
 
 ```ts
-import { StorageClient } from "@noria/storage";
+import { StorageClient } from "@norialabs/storage";
 
 const storage = new StorageClient({
   provider: "s3",
@@ -136,7 +136,7 @@ const storage = new StorageClient({
 ### Explicit R2 credentials
 
 ```ts
-import { StorageClient } from "@noria/storage";
+import { StorageClient } from "@norialabs/storage";
 
 const storage = new StorageClient({
   provider: "r2",
@@ -168,7 +168,7 @@ You can provide your own `client` if you want full control over transport behavi
 
 ```ts
 import { S3Client } from "@aws-sdk/client-s3";
-import { StorageClient } from "@noria/storage";
+import { StorageClient } from "@norialabs/storage";
 
 const rawClient = new S3Client({
   region: "eu-west-1",

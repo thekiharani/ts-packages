@@ -44,35 +44,35 @@ jobs:
 
           packages = [
                 {
-                  "name": "@noria/comm",
+                  "name": "@norialabs/comm",
                   "path": "comm",
                   "publish_node": "24",
                   "tag_prefix": "comm",
                   "test_nodes": ["20", "22", "24"],
                 },
                 {
-                  "name": "@noria/logger",
+                  "name": "@norialabs/logger",
                   "path": "logger",
                   "publish_node": "24",
                   "tag_prefix": "logger",
                   "test_nodes": ["20", "22", "24"],
               },
               {
-                  "name": "@noria/mailer",
+                  "name": "@norialabs/mailer",
                   "path": "mailer",
                   "publish_node": "24",
                   "tag_prefix": "mailer",
                   "test_nodes": ["20", "22", "24"],
               },
               {
-                  "name": "@noria/payments",
+                  "name": "@norialabs/payments",
                   "path": "noriapay",
                   "publish_node": "24",
                   "tag_prefix": "payments",
                   "test_nodes": ["20", "22", "24"],
               },
               {
-                  "name": "@noria/storage",
+                  "name": "@norialabs/storage",
                   "path": "storage",
                   "publish_node": "24",
                   "tag_prefix": "storage",

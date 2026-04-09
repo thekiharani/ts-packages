@@ -1,4 +1,4 @@
-# `@noria/payments`
+# `@norialabs/payments`
 
 Reusable TypeScript/JavaScript SDK for M-PESA Daraja, SasaPay, and Paystack payments.
 
@@ -70,7 +70,7 @@ Important SasaPay note:
 ## Install
 
 ```bash
-npm install @noria/payments
+npm install @norialabs/payments
 ```
 
 ## Runtime
@@ -93,15 +93,15 @@ import {
   PaystackClient,
   TimeoutError,
   WebhookVerificationError,
-} from "@noria/payments";
+} from "@norialabs/payments";
 ```
 
 Provider subpath exports:
 
 ```ts
-import { MpesaClient, buildMpesaStkPassword, buildMpesaTimestamp } from "@noria/payments/mpesa";
-import { PaystackClient } from "@noria/payments/paystack";
-import { SasaPayClient } from "@noria/payments/sasapay";
+import { MpesaClient, buildMpesaStkPassword, buildMpesaTimestamp } from "@norialabs/payments/mpesa";
+import { PaystackClient } from "@norialabs/payments/paystack";
+import { SasaPayClient } from "@norialabs/payments/sasapay";
 ```
 
 ## Quick Start
@@ -109,7 +109,7 @@ import { SasaPayClient } from "@noria/payments/sasapay";
 ### M-PESA
 
 ```ts
-import { MpesaClient, buildMpesaStkPassword, buildMpesaTimestamp } from "@noria/payments/mpesa";
+import { MpesaClient, buildMpesaStkPassword, buildMpesaTimestamp } from "@norialabs/payments/mpesa";
 
 const mpesa = new MpesaClient({
   consumerKey: process.env.MPESA_CONSUMER_KEY!,
@@ -141,7 +141,7 @@ const response = await mpesa.stkPush({
 ### SasaPay
 
 ```ts
-import { SasaPayClient } from "@noria/payments/sasapay";
+import { SasaPayClient } from "@norialabs/payments/sasapay";
 
 const sasapay = new SasaPayClient({
   clientId: process.env.SASAPAY_CLIENT_ID!,
@@ -164,7 +164,7 @@ const response = await sasapay.requestPayment({
 ### Paystack
 
 ```ts
-import { PaystackClient } from "@noria/payments/paystack";
+import { PaystackClient } from "@norialabs/payments/paystack";
 
 const paystack = PaystackClient.fromEnv();
 
@@ -889,7 +889,7 @@ import {
   PAYSTACK_WEBHOOK_IPS,
   requirePaystackSignature,
   requireSourceIp,
-} from "@noria/payments";
+} from "@norialabs/payments";
 
 export function verifyPaystackWebhook(rawBody, signature, sourceIp) {
   requirePaystackSignature(rawBody, signature, process.env.PAYSTACK_SECRET_KEY!);
@@ -917,7 +917,7 @@ Best when:
 Example:
 
 ```ts
-import { MpesaClient } from "@noria/payments/mpesa";
+import { MpesaClient } from "@norialabs/payments/mpesa";
 
 const client = new MpesaClient({
   tokenProvider: {

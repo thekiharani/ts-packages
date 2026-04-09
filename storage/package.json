@@ -1,5 +1,5 @@
 {
-  "name": "@noria/storage",
+  "name": "@norialabs/storage",
   "version": "0.1.0",
   "description": "Configurable S3 and R2 storage client for Node.js services.",
   "type": "module",

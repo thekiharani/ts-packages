@@ -1,5 +1,5 @@
 {
-  "name": "@noria/logger",
+  "name": "@norialabs/logger",
   "version": "0.1.0",
   "description": "Flexible structured JSON logger for Node.js services.",
   "type": "module",

@@ -1,5 +1,5 @@
 {
-  "name": "@noria/mailer",
+  "name": "@norialabs/mailer",
   "version": "0.1.0",
   "description": "Official JavaScript SDK for the Noria Mailer API.",
   "type": "module",

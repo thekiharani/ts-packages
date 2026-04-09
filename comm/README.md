@@ -1,4 +1,4 @@
-# `@noria/comm`
+# `@norialabs/comm`
 
 TypeScript/JavaScript SDK for Onfon SMS and Meta WhatsApp messaging.
 
@@ -7,7 +7,7 @@ Node `>=20` is required.
 ## Install
 
 ```bash
-npm install @noria/comm
+npm install @norialabs/comm
 ```
 
 ## What This Package Gives You
@@ -22,7 +22,7 @@ npm install @noria/comm
 ## Quick Start
 
 ```ts
-import { MessagingClient, OnfonSmsGateway, MetaWhatsAppGateway } from "@noria/comm";
+import { MessagingClient, OnfonSmsGateway, MetaWhatsAppGateway } from "@norialabs/comm";
 
 const messaging = new MessagingClient({
   sms: new OnfonSmsGateway({
@@ -64,15 +64,15 @@ import {
   MetaWhatsAppGateway,
   resolveMetaSubscriptionChallenge,
   verifyMetaSignature,
-} from "@noria/comm";
+} from "@norialabs/comm";
 ```
 
 Subpath exports:
 
 ```ts
-import { OnfonSmsGateway } from "@noria/comm/sms";
-import { MetaWhatsAppGateway } from "@noria/comm/whatsapp";
-import { resolveMetaSubscriptionChallenge } from "@noria/comm/webhooks";
+import { OnfonSmsGateway } from "@norialabs/comm/sms";
+import { MetaWhatsAppGateway } from "@norialabs/comm/whatsapp";
+import { resolveMetaSubscriptionChallenge } from "@norialabs/comm/webhooks";
 ```
 
 ## SMS
@@ -80,7 +80,7 @@ import { resolveMetaSubscriptionChallenge } from "@noria/comm/webhooks";
 ### Onfon gateway construction
 
 ```ts
-import { OnfonSmsGateway } from "@noria/comm";
+import { OnfonSmsGateway } from "@norialabs/comm";
 
 const sms = new OnfonSmsGateway({
   accessKey: process.env.ONFON_ACCESS_KEY!,
@@ -148,7 +148,7 @@ const report = sms.parseDeliveryReport({
 ### Meta gateway construction
 
 ```ts
-import { MetaWhatsAppGateway } from "@noria/comm";
+import { MetaWhatsAppGateway } from "@norialabs/comm";
 
 const whatsapp = new MetaWhatsAppGateway({
   accessToken: process.env.META_WHATSAPP_ACCESS_TOKEN!,
@@ -303,7 +303,7 @@ const inboundMessages = whatsapp.parseInboundMessages(metaWebhookPayload);
 ### Resolve Meta subscription challenge
 
 ```ts
-import { resolveMetaSubscriptionChallenge } from "@noria/comm/webhooks";
+import { resolveMetaSubscriptionChallenge } from "@norialabs/comm/webhooks";
 
 const challenge = resolveMetaSubscriptionChallenge(
   {
@@ -318,7 +318,7 @@ const challenge = resolveMetaSubscriptionChallenge(
 ### Verify Meta signature
 
 ```ts
-import { requireValidMetaSignature } from "@noria/comm/webhooks";
+import { requireValidMetaSignature } from "@norialabs/comm/webhooks";
 
 requireValidMetaSignature(rawBody, req.headers["x-hub-signature-256"], appSecret);
 ```
@@ -326,7 +326,7 @@ requireValidMetaSignature(rawBody, req.headers["x-hub-signature-256"], appSecret
 ### Parse Onfon delivery reports
 
 ```ts
-import { parseOnfonDeliveryReport } from "@noria/comm/webhooks";
+import { parseOnfonDeliveryReport } from "@norialabs/comm/webhooks";
 
 const event = parseOnfonDeliveryReport(req.query, smsGateway);
 ```
