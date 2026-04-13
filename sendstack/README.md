@@ -462,7 +462,7 @@ The SDK understands both:
 
 ## Compatibility Appendix
 
-The package keeps a few helpers for older fully mailer-compatible APIs:
+The package keeps a few helpers for older fully compatible APIs:
 
 - `client.domains`
 - `client.apiKeys`
