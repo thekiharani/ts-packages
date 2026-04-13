@@ -1166,4 +1166,5 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+export const SendstackClient = Mailer;
 export default Mailer;

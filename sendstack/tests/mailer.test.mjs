@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import Mailer, { MailerError } from "../dist/index.js";
+import Mailer, { MailerError, SendstackClient } from "../dist/index.js";
 
 function createJsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
@@ -195,6 +195,17 @@ test("emails.send uses x-api-key auth and normalizes Sendstack email payload ali
       },
     ],
   });
+});
+
+test("exports SendstackClient as an alias of Mailer", () => {
+  assert.equal(SendstackClient, Mailer);
+
+  const client = new SendstackClient("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
+  });
+
+  assert.ok(client instanceof Mailer);
+  assert.equal(client.baseUrl, "https://sendstack.noria.co.ke/api/v1");
 });
 
 test("apiKeys.create unwraps ok/data responses and serializes expiry aliases", async () => {

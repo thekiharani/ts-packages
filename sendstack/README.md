@@ -34,9 +34,9 @@ Change `BASE_URL` once if your Sendstack host changes.
 ### Developer API
 
 ```ts
-import { Mailer } from "@norialabs/sendstack";
+import { SendstackClient } from "@norialabs/sendstack";
 
-const client = new Mailer(API_KEY, {
+const client = new SendstackClient(API_KEY, {
   baseUrl: BASE_URL,
 });
 
@@ -74,9 +74,9 @@ console.log(whatsappMessage.id, whatsappMessage.status);
 ### Merchant API
 
 ```ts
-import { Mailer } from "@norialabs/sendstack";
+import { SendstackClient } from "@norialabs/sendstack";
 
-const merchantClient = new Mailer({
+const merchantClient = new SendstackClient({
   baseUrl: BASE_URL,
   auth: {
     type: "bearer",
@@ -119,6 +119,8 @@ console.log(groupSend.recipient_count);
 
 - `client`
   The main Sendstack SDK client.
+- `SendstackClient`
+  The package-aligned class name. `Mailer` is also exported for compatibility.
 - `client.emails`
   The email part of the API.
 - `client.sms`
@@ -149,7 +151,7 @@ X-API-Key: <apiKey>
 ```
 
 ```ts
-const client = new Mailer(API_KEY, {
+const client = new SendstackClient(API_KEY, {
   baseUrl: BASE_URL,
 });
 ```
