@@ -9,9 +9,25 @@ export type MailerBody =
   | object
   | null;
 
-export interface EmailTag {
-  name: string;
-  value: string;
+export interface EmailAttachmentInput {
+  content: string;
+  filename: string;
+  contentType?: string;
+  content_type?: string;
+  contentId?: string;
+  content_id?: string;
+  disposition?: string;
+  contentDisposition?: string;
+  content_disposition?: string;
+  [key: string]: unknown;
+}
+
+export interface ListManagementOptionsInput {
+  contactListName?: string;
+  contact_list_name?: string;
+  topicName?: string | null;
+  topic_name?: string | null;
+  [key: string]: unknown;
 }
 
 export interface SendEmailRequest {
@@ -20,48 +36,156 @@ export interface SendEmailRequest {
   cc?: Recipient;
   bcc?: Recipient;
   replyTo?: Recipient;
+  reply_to?: Recipient;
+  contactId?: string;
+  contact_id?: string;
   subject: string;
   html?: string;
   text?: string;
+  configurationSetName?: string;
+  configuration_set_name?: string;
+  tenantName?: string;
+  tenant_name?: string;
+  endpointId?: string;
+  endpoint_id?: string;
+  feedbackForwardingEmailAddress?: string;
+  feedback_forwarding_email_address?: string;
+  feedbackForwardingEmailAddressIdentityArn?: string;
+  feedback_forwarding_email_address_identity_arn?: string;
+  fromEmailAddressIdentityArn?: string;
+  from_email_address_identity_arn?: string;
+  listManagementOptions?: ListManagementOptionsInput;
+  list_management_options?: ListManagementOptionsInput;
+  providerConnectionId?: string;
+  provider_connection_id?: string;
+  scheduledAt?: string | Date;
+  scheduled_at?: string | Date;
+  tags?: string[];
   headers?: Record<string, string>;
-  tags?: EmailTag[];
+  attachments?: EmailAttachmentInput[];
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-export interface SendEmailResult {
-  id: string;
-}
-
-export interface Email {
-  object: "email";
-  id: string;
+export interface SendSmsRequest {
   from: string;
-  to: string[];
-  subject: string;
-  html: string | null;
-  text: string | null;
-  cc: string[];
-  bcc: string[];
-  reply_to: string[];
+  to: string;
+  text: string;
+  contactId?: string;
+  contact_id?: string;
+  templateId?: string;
+  template_id?: string;
+  providerConnectionId?: string;
+  provider_connection_id?: string;
+  idempotencyKey?: string;
+  idempotency_key?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface SendWhatsAppRequest {
+  from: string;
+  to: string;
+  text?: string;
+  contactId?: string;
+  contact_id?: string;
+  templateId?: string;
+  template_id?: string;
+  templateVariables?: Record<string, string>;
+  template_variables?: Record<string, string>;
+  variables?: Record<string, string>;
+  providerConnectionId?: string;
+  provider_connection_id?: string;
+  idempotencyKey?: string;
+  idempotency_key?: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface MessageAttachment {
+  id: string;
+  filename: string;
+  content_type: string | null;
+  content_disposition: string | null;
+  content_id: string | null;
+  size_bytes: number;
+  checksum_sha256: string | null;
   created_at: string;
+}
+
+export interface Message {
+  id: string;
+  merchant_id: string;
+  sender_identity_id: string | null;
+  provider_connection_id: string | null;
+  template_id: string | null;
+  contact_id: string | null;
+  channel: string;
+  direction: string;
+  provider_name: string | null;
+  provider_message_id: string | null;
+  to_address: string;
+  from_address: string;
+  subject: string | null;
+  html_body: string | null;
+  text_body: string | null;
+  status: string;
+  error_type: string | null;
+  error_subtype: string | null;
+  queued_at: string | null;
   scheduled_at: string | null;
   sent_at: string | null;
-  tags: EmailTag[];
-  headers: Record<string, string>;
-  message_id: string | null;
-  last_event: string;
+  delivered_at: string | null;
+  failed_at: string | null;
+  units_estimated: number;
+  units_reserved: number;
+  units_consumed: number;
+  pricing: Record<string, unknown>;
+  attachments: MessageAttachment[];
+  metadata: Record<string, unknown>;
+  created_at: string;
   updated_at: string;
 }
 
+export interface MessageQuote {
+  channel: string;
+  estimated_units: number;
+  available_units: number;
+  reserved_units: number;
+  can_send: boolean;
+  pricing: Record<string, unknown>;
+}
+
+export interface MessageBatch {
+  messages: Message[];
+  recipient_count: number;
+  delivery_mode: string;
+}
+
+export interface PaginationResponse<T> {
+  items: T[];
+  next_cursor: string | null;
+  has_more: boolean;
+  limit: number;
+}
+
+export type ListResponse<T> = PaginationResponse<T>;
+export type Email = Message;
+export type SendEmailResult = Message;
+export type SendSmsResult = Message;
+export type SendWhatsAppResult = Message;
+
 export interface ListEmailsOptions {
   limit?: number;
-  offset?: number;
+  cursor?: string;
+  perPage?: number;
+  per_page?: number;
   status?: string;
 }
 
-export interface ListResponse<T> {
-  object: "list";
-  has_more: boolean;
-  data: T[];
+export interface ListMessagesOptions extends ListEmailsOptions {
+  channel?: string;
 }
 
 export interface CreateDomainRequest {
@@ -109,6 +233,7 @@ export interface CreateApiKeyRequest {
   name?: string;
   environment?: ApiKeyEnvironment;
   expiresAt?: string | Date;
+  expires_at?: string | Date;
 }
 
 export interface ApiKey {
@@ -166,7 +291,7 @@ export interface DeleteWebhookResult {
 }
 
 export interface HealthStatus {
-  status: "ok";
+  status: string;
 }
 
 export interface SuccessEnvelope<T> {
@@ -177,7 +302,7 @@ export interface SuccessEnvelope<T> {
 export interface ErrorEnvelope {
   ok: false;
   error: {
-    code: string;
+    code?: string;
     message: string;
     details?: unknown;
   };

@@ -40,13 +40,95 @@ function createSequenceFetch(sequence) {
   };
 }
 
-test("emails.send sends the expected request and idempotency header", async () => {
+function message(overrides = {}) {
+  return {
+    id: "msg_1",
+    merchant_id: "merchant_1",
+    sender_identity_id: null,
+    provider_connection_id: null,
+    template_id: null,
+    contact_id: null,
+    channel: "email",
+    direction: "outbound",
+    provider_name: "sendstack",
+    provider_message_id: null,
+    to_address: "hello@example.com",
+    from_address: "mail@noria.co.ke",
+    subject: "Hello",
+    html_body: "<p>Hello</p>",
+    text_body: "Hello",
+    status: "queued",
+    error_type: null,
+    error_subtype: null,
+    queued_at: "2026-04-13T09:00:00.000Z",
+    scheduled_at: null,
+    sent_at: null,
+    delivered_at: null,
+    failed_at: null,
+    units_estimated: 1,
+    units_reserved: 1,
+    units_consumed: 0,
+    pricing: {},
+    attachments: [],
+    metadata: {},
+    created_at: "2026-04-13T09:00:00.000Z",
+    updated_at: "2026-04-13T09:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function quote(overrides = {}) {
+  return {
+    channel: "email",
+    estimated_units: 1,
+    available_units: 100,
+    reserved_units: 1,
+    can_send: true,
+    pricing: {},
+    ...overrides,
+  };
+}
+
+function batch(overrides = {}) {
+  return {
+    messages: [message()],
+    recipient_count: 2,
+    delivery_mode: "bulk",
+    ...overrides,
+  };
+}
+
+function page(items = [], overrides = {}) {
+  return {
+    items,
+    next_cursor: null,
+    has_more: false,
+    limit: 25,
+    ...overrides,
+  };
+}
+
+function domain(overrides = {}) {
+  return {
+    object: "domain",
+    id: "domain_1",
+    name: "example.com",
+    status: "verified",
+    region: "eu-west-1",
+    created_at: "2026-04-13T09:00:00.000Z",
+    records: [],
+    capabilities: { sending: "enabled", receiving: "disabled" },
+    ...overrides,
+  };
+}
+
+test("emails.send uses x-api-key auth and normalizes Sendstack email payload aliases", async () => {
   const calls = [];
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com/",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1/",
     fetch: async (input, init) => {
       calls.push({ input, init });
-      return createJsonResponse({ id: "email_123" });
+      return createJsonResponse(message());
     },
   });
 
@@ -54,20 +136,37 @@ test("emails.send sends the expected request and idempotency header", async () =
     {
       from: "Noria Demo <mail@noria.co.ke>",
       to: "hello@example.com",
-      subject: "Hello",
-      text: "World",
-      replyTo: ["support@noria.co.ke"],
+      reply_to: ["support@noria.co.ke", "ops@noria.co.ke"],
+      subject: "Hello from Sendstack",
+      html: "<p>Hello</p>",
+      text: "Hello",
+      contactId: "contact_123",
+      providerConnectionId: "provider_123",
+      scheduled_at: new Date("2026-04-14T09:00:00.000Z"),
+      list_management_options: {
+        contact_list_name: "product-updates",
+        topic_name: "launches",
+      },
+      attachments: [
+        {
+          content: "aGVsbG8=",
+          filename: "hello.txt",
+          content_type: "text/plain",
+          content_id: "attachment-1",
+          contentDisposition: "attachment",
+        },
+      ],
     },
     { idempotencyKey: "send-1" },
   );
 
-  assert.deepEqual(result, { id: "email_123" });
+  assert.equal(result.id, "msg_1");
   assert.equal(calls.length, 1);
 
   const [{ input, init }] = calls;
-  assert.equal(String(input), "https://mailer.example.com/emails");
+  assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/emails");
   assert.equal(init.method, "POST");
-  assert.equal(init.headers.get("authorization"), "Bearer mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret");
+  assert.equal(init.headers.get("x-api-key"), "sk_live_123");
   assert.equal(init.headers.get("idempotency-key"), "send-1");
   assert.equal(init.headers.get("content-type"), "application/json");
 
@@ -75,85 +174,149 @@ test("emails.send sends the expected request and idempotency header", async () =
   assert.deepEqual(body, {
     from: "Noria Demo <mail@noria.co.ke>",
     to: "hello@example.com",
-    subject: "Hello",
-    text: "World",
-    replyTo: ["support@noria.co.ke"],
+    replyTo: ["support@noria.co.ke", "ops@noria.co.ke"],
+    subject: "Hello from Sendstack",
+    html: "<p>Hello</p>",
+    text: "Hello",
+    contact_id: "contact_123",
+    provider_connection_id: "provider_123",
+    scheduledAt: "2026-04-14T09:00:00.000Z",
+    listManagementOptions: {
+      contactListName: "product-updates",
+      topicName: "launches",
+    },
+    attachments: [
+      {
+        content: "aGVsbG8=",
+        filename: "hello.txt",
+        contentType: "text/plain",
+        contentId: "attachment-1",
+        disposition: "attachment",
+      },
+    ],
   });
 });
 
-test("apiKeys.create unwraps ok/data responses", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
-    fetch: async () =>
-      createJsonResponse({
-        ok: true,
-        data: {
-          id: "018f8c89-acde-7cc2-8a37-c7f2e051a123",
-          key: "mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret",
-          token: "mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret",
-          keyPrefix: "mk_live_018f8c89",
-          environment: "live",
-          createdAt: "2026-03-25T19:00:00.000Z",
+test("apiKeys.create unwraps ok/data responses and serializes expiry aliases", async () => {
+  const bodies = [];
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
+    fetch: createSequenceFetch([
+      {
+        assert: (_input, init) => {
+          bodies.push(JSON.parse(init.body));
         },
-      }),
+        response: createJsonResponse({
+          ok: true,
+          data: {
+            id: "key_1",
+            key: "sk_live_123",
+            token: "sk_live_123",
+            keyPrefix: "sk_live",
+            environment: "live",
+            createdAt: "2026-04-13T09:00:00.000Z",
+          },
+        }),
+      },
+      {
+        assert: (_input, init) => {
+          bodies.push(JSON.parse(init.body));
+        },
+        response: createJsonResponse({
+          ok: true,
+          data: {
+            id: "key_2",
+            key: "sk_sandbox_123",
+            token: "sk_sandbox_123",
+            keyPrefix: "sk_sandbox",
+            environment: "sandbox",
+            createdAt: "2026-04-13T09:00:00.000Z",
+          },
+        }),
+      },
+    ]),
   });
 
-  const result = await client.apiKeys.create({
+  const first = await client.apiKeys.create({
     name: "Primary",
-    expiresAt: new Date("2026-03-26T00:00:00.000Z"),
+    expires_at: new Date("2026-04-14T00:00:00.000Z"),
+  });
+  const second = await client.apiKeys.create({
+    environment: "sandbox",
+    expiresAt: "2026-04-15T00:00:00.000Z",
   });
 
-  assert.equal(result.environment, "live");
-  assert.equal(result.keyPrefix, "mk_live_018f8c89");
+  assert.equal(first.environment, "live");
+  assert.equal(second.environment, "sandbox");
+  assert.deepEqual(bodies, [
+    {
+      name: "Primary",
+      expiresAt: "2026-04-14T00:00:00.000Z",
+    },
+    {
+      environment: "sandbox",
+      expiresAt: "2026-04-15T00:00:00.000Z",
+    },
+  ]);
 });
 
-test("emails.list encodes query params correctly", async () => {
+test("emails.list encodes cursor pagination and status filters correctly", async () => {
   let capturedUrl = null;
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     fetch: async (input) => {
       capturedUrl = String(input);
-      return createJsonResponse({ object: "list", has_more: false, data: [] });
+      return createJsonResponse(page([]));
     },
   });
 
-  const result = await client.emails.list({ limit: 25, offset: 50, status: "sent" });
+  const result = await client.emails.list({ limit: 25, cursor: "cur_1", perPage: 25, status: "queued" });
 
-  assert.deepEqual(result, { object: "list", has_more: false, data: [] });
-  assert.equal(capturedUrl, "https://mailer.example.com/emails?limit=25&offset=50&status=sent");
+  assert.deepEqual(result, page([]));
+  assert.equal(
+    capturedUrl,
+    "https://sendstack.noria.co.ke/api/v1/emails?limit=25&cursor=cur_1&per_page=25&status=queued",
+  );
 });
 
-test("preserves baseUrl path prefixes", async () => {
+test("preserves baseUrl path prefixes for relative resource calls", async () => {
   let capturedUrl = null;
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://gateway.example.com/mailer-api",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://gateway.example.com/sendstack-api",
     fetch: async (input) => {
       capturedUrl = String(input);
-      return createJsonResponse({ object: "list", has_more: false, data: [] });
+      return createJsonResponse(page([]));
     },
   });
 
-  await client.emails.list();
+  await client.sms.list();
 
-  assert.equal(capturedUrl, "https://gateway.example.com/mailer-api/emails");
+  assert.equal(capturedUrl, "https://gateway.example.com/sendstack-api/sms");
 });
 
-test("health endpoints are unauthenticated", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
-    fetch: async (_input, init) => {
+test("health.live is root-scoped and unauthenticated by default", async () => {
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
+    headers: {
+      authorization: "Bearer should-be-stripped",
+      "x-client": "sdk-test",
+    },
+    fetch: async (input, init) => {
+      assert.equal(String(input), "https://sendstack.noria.co.ke/livez");
       assert.equal(init.headers.get("authorization"), null);
+      assert.equal(init.headers.get("x-api-key"), null);
+      assert.equal(init.headers.get("x-client"), "sdk-test");
       return createJsonResponse({ ok: true, data: { status: "ok" } });
     },
   });
 
-  const result = await client.health.check();
+  const result = await client.health.live();
   assert.deepEqual(result, { status: "ok" });
 });
 
-test("throws MailerError for structured API errors", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+test("throws MailerError for structured compatibility error envelopes", async () => {
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     fetch: async () =>
       createJsonResponse(
         {
@@ -180,122 +343,270 @@ test("throws MailerError for structured API errors", async () => {
   );
 });
 
-test("constructor allows custom auth but still validates baseUrl", () => {
-  const client = new Mailer("", { baseUrl: "https://mailer.example.com" });
+test("throws MailerError for FastAPI detail responses", async () => {
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
+    fetch: async () =>
+      createJsonResponse(
+        {
+          detail: "Provide exactly one To recipient for this email endpoint",
+          errors: [{ field: "to", message: "too many recipients" }],
+        },
+        { status: 422 },
+      ),
+  });
+
+  await assert.rejects(
+    () => client.emails.send({
+      from: "sender@example.com",
+      to: ["a@example.com", "b@example.com"],
+      subject: "Hello",
+      text: "World",
+    }),
+    (error) => {
+      assert.ok(error instanceof MailerError);
+      assert.equal(error.statusCode, 422);
+      assert.equal(error.message, "Provide exactly one To recipient for this email endpoint");
+      assert.deepEqual(error.details, [{ field: "to", message: "too many recipients" }]);
+      return true;
+    },
+  );
+});
+
+test("constructor allows options-only usage and still validates baseUrl", () => {
+  const client = new Mailer({ baseUrl: "https://sendstack.noria.co.ke/api/v1" });
   assert.equal(client.apiKey, "");
+
   assert.throws(
-    () => new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", { baseUrl: "" }),
+    () => new Mailer("sk_live_123"),
+    /baseUrl is required/,
+  );
+
+  assert.throws(
+    () => new Mailer("sk_live_123", { baseUrl: "" }),
     /baseUrl is required/,
   );
 });
 
-test("authenticated requests require configured auth unless explicitly overridden", async () => {
-  const client = new Mailer("", {
-    baseUrl: "https://mailer.example.com",
-  });
+test("authenticated requests require configured auth unless explicit auth headers are supplied", async () => {
+  const client = new Mailer({ baseUrl: "https://sendstack.noria.co.ke/api/v1" });
 
   await assert.rejects(
-    () => client.emails.get("email_1"),
+    () => client.emails.get("msg_1"),
     /Mailer auth is required for authenticated requests/,
   );
+
+  const xApiKeyClient = new Mailer({
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
+    auth: false,
+  });
+
+  const xApiKeyResult = await xApiKeyClient.request("GET", "/explicit-x-api-key", {
+    headers: {
+      "x-api-key": "manual-key",
+    },
+    fetch: async (_input, init) => {
+      assert.equal(init.headers.get("x-api-key"), "manual-key");
+      return createJsonResponse({ ok: true, data: { ok: true } });
+    },
+  });
+
+  assert.deepEqual(xApiKeyResult, { ok: true });
 });
 
-test("all resource methods hit the expected endpoints", async () => {
+test("all resource methods hit the expected Sendstack endpoints", async () => {
   const signal = new AbortController().signal;
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com/base/",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     fetch: createSequenceFetch([
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/emails/batch");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/emails/batch");
           assert.equal(init.method, "POST");
-          assert.equal(init.headers.get("authorization"), "Bearer mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret");
+          assert.equal(init.headers.get("x-api-key"), "sk_live_123");
         },
-        response: createJsonResponse({ data: [{ id: "email_1" }, { id: "email_2" }] }),
-      },
-      {
-        assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/emails/email_1");
-          assert.equal(init.method, "GET");
-        },
-        response: createJsonResponse({
-          object: "email",
-          id: "email_1",
-          from: "a@example.com",
-          to: ["b@example.com"],
-          subject: "Hi",
-          html: null,
-          text: "Hi",
-          cc: [],
-          bcc: [],
-          reply_to: [],
-          created_at: "2026-03-25T19:00:00.000Z",
-          scheduled_at: null,
-          sent_at: null,
-          tags: [],
-          headers: {},
-          message_id: null,
-          last_event: "queued",
-          updated_at: "2026-03-25T19:00:00.000Z",
-        }),
-      },
-      {
-        assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/domains");
-          assert.equal(init.method, "POST");
-          assert.deepEqual(JSON.parse(init.body), { name: "example.com" });
-        },
-        response: createJsonResponse({
-          object: "domain",
-          id: "domain_1",
-          name: "example.com",
-          status: "not_started",
-          region: "eu-west-1",
-          created_at: "2026-03-25T19:00:00.000Z",
-          records: [],
-          capabilities: { sending: "enabled", receiving: "disabled" },
-        }, { status: 201 }),
-      },
-      {
-        assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/domains");
-          assert.equal(init.method, "GET");
-        },
-        response: createJsonResponse({ object: "list", has_more: false, data: [] }),
+        response: createJsonResponse({ data: [{ id: "msg_batch_1" }, { id: "msg_batch_2" }] }),
       },
       {
         assert: (input) => {
-          assert.equal(String(input), "https://mailer.example.com/base/domains/domain_1");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/emails/msg_1");
         },
-        response: createJsonResponse({
-          object: "domain",
-          id: "domain_1",
-          name: "example.com",
-          status: "verified",
-          region: "eu-west-1",
-          created_at: "2026-03-25T19:00:00.000Z",
-          records: [],
-          capabilities: { sending: "enabled", receiving: "disabled" },
-        }),
+        response: createJsonResponse(message()),
       },
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/domains/domain_1/verify");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/sms/quote");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            from: "SENDSTACK",
+            to: "+254722111222",
+            text: "Quote me",
+            contact_id: "contact_1",
+            template_id: "template_1",
+            provider_connection_id: "provider_1",
+            idempotency_key: "sms-body-idempotency",
+          });
+        },
+        response: createJsonResponse(quote({ channel: "sms" })),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/sms");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse(message({ id: "sms_1", channel: "sms", to_address: "+254722111222" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/sms/sms_1");
+        },
+        response: createJsonResponse(message({ id: "sms_1", channel: "sms", to_address: "+254722111222" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(
+            String(input),
+            "https://sendstack.noria.co.ke/api/v1/sms?limit=20&cursor=cur_sms&per_page=20&status=sent",
+          );
+        },
+        response: createJsonResponse(page([message({ id: "sms_1", channel: "sms", to_address: "+254722111222" })], { limit: 20 })),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/whatsapp/messages/quote");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            from: "WABA",
+            to: "+254733000333",
+            template_id: "wa_template_1",
+            variables: { first_name: "Mercy" },
+            provider_connection_id: "wa_provider_1",
+          });
+        },
+        response: createJsonResponse(quote({ channel: "whatsapp" })),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/whatsapp/messages");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse(message({ id: "wa_1", channel: "whatsapp", to_address: "+254733000333" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/whatsapp/messages/wa_1");
+        },
+        response: createJsonResponse(message({ id: "wa_1", channel: "whatsapp", to_address: "+254733000333" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(
+            String(input),
+            "https://sendstack.noria.co.ke/api/v1/whatsapp/messages?limit=15&cursor=cur_wa&per_page=15&status=delivered",
+          );
+        },
+        response: createJsonResponse(page([message({ id: "wa_1", channel: "whatsapp" })], { limit: 15 })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(
+            String(input),
+            "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages?limit=10&cursor=cur_merchant&per_page=10&status=queued&channel=email",
+          );
+        },
+        response: createJsonResponse(page([message()], { limit: 10 })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/msg_1");
+        },
+        response: createJsonResponse(message()),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/email/quote");
+        },
+        response: createJsonResponse(quote({ channel: "email" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/email/group/quote");
+        },
+        response: createJsonResponse(quote({ channel: "email" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/email");
+        },
+        response: createJsonResponse(message({ id: "merchant_email_1" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/email/group");
+        },
+        response: createJsonResponse(batch()),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/sms/quote");
+        },
+        response: createJsonResponse(quote({ channel: "sms" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/sms");
+        },
+        response: createJsonResponse(message({ id: "merchant_sms_1", channel: "sms" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/whatsapp/quote");
+        },
+        response: createJsonResponse(quote({ channel: "whatsapp" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/merchants/merchant_1/messages/whatsapp");
+        },
+        response: createJsonResponse(message({ id: "merchant_wa_1", channel: "whatsapp" })),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/domains");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), { name: "example.com" });
+        },
+        response: createJsonResponse(domain(), { status: 201 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/domains");
+        },
+        response: createJsonResponse(page([], { limit: 25 })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/domains/domain_1");
+        },
+        response: createJsonResponse(domain()),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/domains/domain_1/verify");
           assert.equal(init.method, "POST");
         },
         response: createJsonResponse({ object: "domain", id: "domain_1" }),
       },
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/domains/domain_1");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/domains/domain_1");
           assert.equal(init.method, "DELETE");
         },
         response: createJsonResponse({ object: "domain", id: "domain_1", deleted: true }),
       },
       {
-        assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/api-keys");
-          assert.equal(init.method, "GET");
+        assert: (input) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/api-keys");
         },
         response: createJsonResponse({
           ok: true,
@@ -303,48 +614,48 @@ test("all resource methods hit the expected endpoints", async () => {
             {
               id: "key_1",
               accountId: "acct_1",
-              keyPrefix: "mk_live_018f8c89",
+              keyPrefix: "sk_live",
               name: null,
               environment: "live",
               isActive: true,
               lastUsedAt: null,
               expiresAt: null,
               revokedAt: null,
-              createdAt: "2026-03-25T19:00:00.000Z",
+              createdAt: "2026-04-13T09:00:00.000Z",
             },
           ],
         }),
       },
       {
         assert: (input) => {
-          assert.equal(String(input), "https://mailer.example.com/base/api-keys/key_1");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/api-keys/key_1");
         },
         response: createJsonResponse({
           ok: true,
           data: {
             id: "key_1",
             accountId: "acct_1",
-            keyPrefix: "mk_live_018f8c89",
+            keyPrefix: "sk_live",
             name: null,
             environment: "live",
             isActive: true,
             lastUsedAt: null,
             expiresAt: null,
             revokedAt: null,
-            createdAt: "2026-03-25T19:00:00.000Z",
+            createdAt: "2026-04-13T09:00:00.000Z",
           },
         }),
       },
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/api-keys/key_1");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/api-keys/key_1");
           assert.equal(init.method, "DELETE");
         },
         response: createJsonResponse({ ok: true, data: { revoked: true } }),
       },
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/webhooks");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/webhooks");
           assert.equal(init.method, "POST");
           assert.deepEqual(JSON.parse(init.body), {
             url: "https://example.com/webhook",
@@ -358,14 +669,14 @@ test("all resource methods hit the expected endpoints", async () => {
             url: "https://example.com/webhook",
             events: ["email.sent"],
             is_active: true,
-            created_at: "2026-03-25T19:00:00.000Z",
-            updated_at: "2026-03-25T19:00:00.000Z",
+            created_at: "2026-04-13T09:00:00.000Z",
+            updated_at: "2026-04-13T09:00:00.000Z",
           },
         }, { status: 201 }),
       },
       {
         assert: (input) => {
-          assert.equal(String(input), "https://mailer.example.com/base/webhooks");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/webhooks");
         },
         response: createJsonResponse({
           ok: true,
@@ -375,22 +686,23 @@ test("all resource methods hit the expected endpoints", async () => {
               url: "https://example.com/webhook",
               events: ["email.sent"],
               is_active: true,
-              created_at: "2026-03-25T19:00:00.000Z",
-              updated_at: "2026-03-25T19:00:00.000Z",
+              created_at: "2026-04-13T09:00:00.000Z",
+              updated_at: "2026-04-13T09:00:00.000Z",
             },
           ],
         }),
       },
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/base/webhooks/webhook_1");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/webhooks/webhook_1");
           assert.equal(init.method, "DELETE");
         },
         response: createJsonResponse({ ok: true, data: { deleted: true } }),
       },
       {
-        assert: (input) => {
-          assert.equal(String(input), "https://mailer.example.com/base/readyz");
+        assert: (input, init) => {
+          assert.equal(String(input), "https://sendstack.noria.co.ke/readyz");
+          assert.equal(init.headers.get("x-api-key"), "sk_live_123");
         },
         response: createJsonResponse({ ok: true, data: { status: "ok" } }),
       },
@@ -400,11 +712,104 @@ test("all resource methods hit the expected endpoints", async () => {
   assert.deepEqual(await client.emails.sendBatch([
     { from: "a@example.com", to: "b@example.com", subject: "1", text: "1" },
     { from: "a@example.com", to: "c@example.com", subject: "2", text: "2" },
-  ]), [{ id: "email_1" }, { id: "email_2" }]);
-  assert.equal((await client.emails.get("email_1")).id, "email_1");
+  ], { signal }), [{ id: "msg_batch_1" }, { id: "msg_batch_2" }]);
+  assert.equal((await client.emails.get("msg_1", { signal })).id, "msg_1");
+  assert.equal((await client.sms.quote({
+    from: "SENDSTACK",
+    to: "+254722111222",
+    text: "Quote me",
+    contactId: "contact_1",
+    templateId: "template_1",
+    providerConnectionId: "provider_1",
+    idempotencyKey: "sms-body-idempotency",
+  }, { signal })).channel, "sms");
+  assert.equal((await client.sms.send({
+    from: "SENDSTACK",
+    to: "+254722111222",
+    text: "Hello",
+  }, { signal })).id, "sms_1");
+  assert.equal((await client.sms.get("sms_1", { signal })).id, "sms_1");
+  assert.equal((await client.sms.list({ limit: 20, cursor: "cur_sms", perPage: 20, status: "sent", signal })).items[0].id, "sms_1");
+  assert.equal((await client.whatsapp.quote({
+    from: "WABA",
+    to: "+254733000333",
+    templateId: "wa_template_1",
+    templateVariables: { first_name: "Mercy" },
+    providerConnectionId: "wa_provider_1",
+  }, { signal })).channel, "whatsapp");
+  assert.equal((await client.whatsapp.send({
+    from: "WABA",
+    to: "+254733000333",
+    text: "Hello from WhatsApp",
+  }, { signal })).id, "wa_1");
+  assert.equal((await client.whatsapp.get("wa_1", { signal })).id, "wa_1");
+  assert.equal((await client.whatsapp.list({
+    limit: 15,
+    cursor: "cur_wa",
+    per_page: 15,
+    status: "delivered",
+    signal,
+  })).items[0].id, "wa_1");
+  assert.equal((await client.merchant.messages.list("merchant_1", {
+    limit: 10,
+    cursor: "cur_merchant",
+    perPage: 10,
+    status: "queued",
+    channel: "email",
+    signal,
+  })).items[0].id, "msg_1");
+  assert.equal((await client.merchant.messages.get("merchant_1", "msg_1", { signal })).id, "msg_1");
+  assert.equal((await client.merchant.emails.quote("merchant_1", {
+    from: "sender@example.com",
+    to: "a@example.com",
+    subject: "Subject",
+    html: "<p>Hello</p>",
+    text: "Hello",
+  }, { signal })).channel, "email");
+  assert.equal((await client.merchant.emails.quoteGroup("merchant_1", {
+    from: "sender@example.com",
+    to: ["a@example.com", "b@example.com"],
+    subject: "Subject",
+    html: "<p>Hello</p>",
+    text: "Hello",
+  }, { signal })).channel, "email");
+  assert.equal((await client.merchant.emails.send("merchant_1", {
+    from: "sender@example.com",
+    to: "a@example.com",
+    subject: "Subject",
+    html: "<p>Hello</p>",
+    text: "Hello",
+  }, { signal })).id, "merchant_email_1");
+  assert.equal((await client.merchant.emails.sendGroup("merchant_1", {
+    from: "sender@example.com",
+    to: ["a@example.com", "b@example.com"],
+    subject: "Subject",
+    html: "<p>Hello</p>",
+    text: "Hello",
+  }, { signal })).recipient_count, 2);
+  assert.equal((await client.merchant.sms.quote("merchant_1", {
+    from: "SENDSTACK",
+    to: "+254722111222",
+    text: "Hello",
+  }, { signal })).channel, "sms");
+  assert.equal((await client.merchant.sms.send("merchant_1", {
+    from: "SENDSTACK",
+    to: "+254722111222",
+    text: "Hello",
+  }, { signal })).id, "merchant_sms_1");
+  assert.equal((await client.merchant.whatsapp.quote("merchant_1", {
+    from: "WABA",
+    to: "+254733000333",
+    text: "Hello",
+  }, { signal })).channel, "whatsapp");
+  assert.equal((await client.merchant.whatsapp.send("merchant_1", {
+    from: "WABA",
+    to: "+254733000333",
+    text: "Hello",
+  }, { signal })).id, "merchant_wa_1");
   assert.equal((await client.domains.create({ name: "example.com" }, { signal })).id, "domain_1");
-  assert.deepEqual(await client.domains.list({ signal }), { object: "list", has_more: false, data: [] });
-  assert.equal((await client.domains.get("domain_1", { signal })).status, "verified");
+  assert.deepEqual(await client.domains.list({ signal }), page([], { limit: 25 }));
+  assert.equal((await client.domains.get("domain_1", { signal })).name, "example.com");
   assert.deepEqual(await client.domains.verify("domain_1", { signal }), { object: "domain", id: "domain_1" });
   assert.deepEqual(await client.domains.remove("domain_1", { signal }), {
     object: "domain",
@@ -420,61 +825,12 @@ test("all resource methods hit the expected endpoints", async () => {
   }, { signal })).id, "webhook_1");
   assert.equal((await client.webhooks.list({ signal }))[0].id, "webhook_1");
   assert.deepEqual(await client.webhooks.remove("webhook_1", { signal }), { deleted: true });
-  assert.deepEqual(await client.health.ready({ signal }), { status: "ok" });
-});
-
-test("apiKeys.create supports empty and string expiry payloads", async () => {
-  const bodies = [];
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
-    fetch: createSequenceFetch([
-      {
-        assert: (_input, init) => {
-          bodies.push(JSON.parse(init.body));
-        },
-        response: createJsonResponse({
-          ok: true,
-          data: {
-            id: "key_1",
-            key: "mk_live_1_secret",
-            token: "mk_live_1_secret",
-            keyPrefix: "mk_live_1",
-            environment: "live",
-            createdAt: "2026-03-25T19:00:00.000Z",
-          },
-        }),
-      },
-      {
-        assert: (_input, init) => {
-          bodies.push(JSON.parse(init.body));
-        },
-        response: createJsonResponse({
-          ok: true,
-          data: {
-            id: "key_2",
-            key: "mk_sandbox_2_secret",
-            token: "mk_sandbox_2_secret",
-            keyPrefix: "mk_sandbox_2",
-            environment: "sandbox",
-            createdAt: "2026-03-25T19:00:00.000Z",
-          },
-        }),
-      },
-    ]),
-  });
-
-  await client.apiKeys.create(undefined, { signal: new AbortController().signal });
-  await client.apiKeys.create({
-    environment: "sandbox",
-    expiresAt: "2026-03-26T00:00:00.000Z",
-  }, { signal: new AbortController().signal });
-
-  assert.deepEqual(bodies, [{}, { environment: "sandbox", expiresAt: "2026-03-26T00:00:00.000Z" }]);
+  assert.deepEqual(await client.health.ready({ signal, authenticated: true }), { status: "ok" });
 });
 
 test("custom headers are preserved when already provided", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     headers: {
       accept: "text/plain",
       "content-type": "application/vnd.api+json",
@@ -484,62 +840,20 @@ test("custom headers are preserved when already provided", async () => {
       assert.equal(init.headers.get("accept"), "text/plain");
       assert.equal(init.headers.get("content-type"), "application/vnd.api+json");
       assert.equal(init.headers.get("x-client"), "sdk-test");
-      return createJsonResponse({ id: "email_123" });
+      return createJsonResponse(message({ channel: "sms" }));
     },
   });
 
-  await client.emails.send({
-    from: "a@example.com",
-    to: "b@example.com",
-    subject: "Hello",
-    text: "World",
+  await client.sms.send({
+    from: "SENDSTACK",
+    to: "+254722111222",
+    text: "Hello",
   });
-});
-
-test("emails.send supports extra payload fields and per-request overrides", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
-    headers: {
-      "x-client": "default",
-    },
-    fetch: async () => {
-      throw new Error("request-level fetch override was not used");
-    },
-  });
-
-  const result = await client.emails.send(
-    {
-      from: "a@example.com",
-      to: "b@example.com",
-      subject: "Hello",
-      text: "World",
-      scheduledAt: "2026-03-28T09:00:00.000Z",
-    },
-    {
-      headers: {
-        "x-tenant-id": "tenant_123",
-      },
-      fetch: async (input, init) => {
-        assert.equal(String(input), "https://mailer.example.com/emails?provider=backup");
-        assert.equal(init.headers.get("authorization"), "Bearer mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret");
-        assert.equal(init.headers.get("x-client"), "default");
-        assert.equal(init.headers.get("x-tenant-id"), "tenant_123");
-        assert.equal(JSON.parse(init.body).scheduledAt, "2026-03-28T09:00:00.000Z");
-        return createJsonResponse({ id: "email_123" });
-      },
-      idempotencyKey: "send-123",
-      query: {
-        provider: "backup",
-      },
-    },
-  );
-
-  assert.deepEqual(result, { id: "email_123" });
 });
 
 test("supports auth strategies and middleware composition", async () => {
-  const client = new Mailer("", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer({
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     auth: {
       type: "headers",
       headers: (context) => ({
@@ -563,7 +877,7 @@ test("supports auth strategies and middleware composition", async () => {
       },
     ],
     fetch: async (input, init) => {
-      assert.equal(String(input), "https://mailer.example.com/custom?via=middleware");
+      assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/custom?via=middleware");
       assert.equal(init.headers.get("x-auth-path"), "/custom");
       assert.equal(init.headers.get("x-middleware"), "outer");
       assert.equal(init.headers.get("x-inner"), "true");
@@ -574,9 +888,9 @@ test("supports auth strategies and middleware composition", async () => {
   assert.deepEqual(result, { ok: true });
 });
 
-test("supports bearer auth callbacks, static header auth, and caller-supplied authorization headers", async () => {
-  const clientWithBearerCallback = new Mailer("", {
-    baseUrl: "https://mailer.example.com",
+test("supports bearer auth callbacks, static header auth, and caller-supplied auth headers", async () => {
+  const clientWithBearerCallback = new Mailer({
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     auth: {
       type: "bearer",
       token: async (context) => `token-for:${context.path}`,
@@ -592,8 +906,8 @@ test("supports bearer auth callbacks, static header auth, and caller-supplied au
     },
   });
 
-  const clientWithStaticHeaderAuth = new Mailer("", {
-    baseUrl: "https://mailer.example.com",
+  const clientWithStaticHeaderAuth = new Mailer({
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     auth: {
       type: "headers",
       headers: {
@@ -609,23 +923,23 @@ test("supports bearer auth callbacks, static header auth, and caller-supplied au
     },
   });
 
-  const clientWithExplicitHeader = new Mailer("", {
-    baseUrl: "https://mailer.example.com",
+  const clientWithExplicitXApiKey = new Mailer({
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     auth: false,
   });
 
-  await clientWithExplicitHeader.request("GET", "/explicit-auth-header", {
+  await clientWithExplicitXApiKey.request("GET", "/explicit-x-api-key", {
     headers: {
-      authorization: "Bearer pre-signed",
+      "x-api-key": "manual-key",
     },
     fetch: async (_input, init) => {
-      assert.equal(init.headers.get("authorization"), "Bearer pre-signed");
+      assert.equal(init.headers.get("x-api-key"), "manual-key");
       return createJsonResponse({ ok: true, data: { ok: true } });
     },
   });
 
-  await new Mailer("mk_live_default_secret", {
-    baseUrl: "https://mailer.example.com",
+  await new Mailer("sk_live_default", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
   }).request("GET", "/request-level-auth-off", {
     auth: false,
     headers: {
@@ -638,15 +952,18 @@ test("supports bearer auth callbacks, static header auth, and caller-supplied au
   });
 });
 
-test("request supports raw endpoint access with merged headers and rich query params", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com/base",
+test("request supports raw endpoint access with merged headers, query params, and absolute urls", async () => {
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     headers: {
       "x-client": "default",
     },
+    query: {
+      account: "acct_1",
+    },
   });
 
-  const result = await client.request("POST", "/reports/export", {
+  const result = await client.request("POST", "https://api.partner.example.com/reports/export", {
     body: {
       format: "csv",
     },
@@ -655,14 +972,14 @@ test("request supports raw endpoint access with merged headers and rich query pa
     },
     query: {
       tag: ["welcome", "trial"],
-      since: new Date("2026-03-27T00:00:00.000Z"),
+      since: new Date("2026-04-13T00:00:00.000Z"),
     },
     fetch: async (input, init) => {
       assert.equal(
         String(input),
-        "https://mailer.example.com/base/reports/export?tag=welcome&tag=trial&since=2026-03-27T00%3A00%3A00.000Z",
+        "https://api.partner.example.com/reports/export?account=acct_1&tag=welcome&tag=trial&since=2026-04-13T00%3A00%3A00.000Z",
       );
-      assert.equal(init.headers.get("authorization"), "Bearer mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret");
+      assert.equal(init.headers.get("x-api-key"), "sk_live_123");
       assert.equal(init.headers.get("x-client"), "default");
       assert.equal(init.headers.get("x-request-id"), "req_123");
       assert.deepEqual(JSON.parse(init.body), { format: "csv" });
@@ -674,8 +991,8 @@ test("request supports raw endpoint access with merged headers and rich query pa
 });
 
 test("query merging ignores undefined values and native bodies are passed through unchanged", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     query: {
       account: "acct_1",
       skip: undefined,
@@ -696,7 +1013,10 @@ test("query merging ignores undefined values and native bodies are passed throug
       empty: undefined,
     },
     fetch: async (input, init) => {
-      assert.equal(String(input), "https://mailer.example.com/native-body?account=acct_1&tag=welcome&tag=trial");
+      assert.equal(
+        String(input),
+        "https://sendstack.noria.co.ke/api/v1/native-body?account=acct_1&tag=welcome&tag=trial",
+      );
       assert.equal(init.body, body);
       assert.equal(init.headers.get("content-type"), "application/x-www-form-urlencoded");
       return createJsonResponse({ ok: true, data: { ok: true } });
@@ -705,8 +1025,8 @@ test("query merging ignores undefined values and native bodies are passed throug
 });
 
 test("supports custom response parsing and transform hooks", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
   });
 
   const result = await client.request("GET", "/metrics", {
@@ -728,8 +1048,8 @@ test("supports custom response parsing and transform hooks", async () => {
 });
 
 test("request can skip ok/data unwrapping when needed", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
   });
 
   const result = await client.request("GET", "/raw-envelope", {
@@ -742,8 +1062,8 @@ test("request can skip ok/data unwrapping when needed", async () => {
 
 test("supports opt-in retry policies", async () => {
   let attempts = 0;
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
   });
 
   const result = await client.request("GET", "/retry-me", {
@@ -768,8 +1088,8 @@ test("supports opt-in retry policies", async () => {
 
 test("supports numeric retry config, function delays, and default response-based retries", async () => {
   let numericAttempts = 0;
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
   });
 
   const numericResult = await client.request("GET", "/retry-number", {
@@ -846,11 +1166,11 @@ test("supports numeric retry config, function delays, and default response-based
 });
 
 test("sendBatch handles direct arrays and passthrough payloads", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     fetch: createSequenceFetch([
       {
-        response: createJsonResponse([{ id: "email_1" }]),
+        response: createJsonResponse([{ id: "msg_1" }]),
       },
       {
         response: createJsonResponse({ ok: true, data: { notice: "not-an-array" } }),
@@ -860,22 +1180,23 @@ test("sendBatch handles direct arrays and passthrough payloads", async () => {
 
   assert.deepEqual(await client.emails.sendBatch([
     { from: "a@example.com", to: "b@example.com", subject: "A", text: "A" },
-  ]), [{ id: "email_1" }]);
+  ]), [{ id: "msg_1" }]);
 
   assert.deepEqual(await client.emails.sendBatch([
     { from: "a@example.com", to: "c@example.com", subject: "B", text: "B" },
   ]), { ok: true, data: { notice: "not-an-array" } });
 });
 
-test("unauthenticated requests strip inherited authorization headers", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+test("unauthenticated requests strip inherited authorization and x-api-key headers", async () => {
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     headers: {
       authorization: "Bearer custom-token",
       "x-client": "default",
     },
     fetch: async (_input, init) => {
       assert.equal(init.headers.get("authorization"), null);
+      assert.equal(init.headers.get("x-api-key"), null);
       assert.equal(init.headers.get("x-client"), "default");
       return createJsonResponse({ ok: true, data: { status: "ok" } });
     },
@@ -885,8 +1206,8 @@ test("unauthenticated requests strip inherited authorization headers", async () 
 });
 
 test("parses empty, json-like text, plain text, object, error-like, and null error bodies", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     fetch: createSequenceFetch([
       {
         response: createTextResponse("", { status: 200 }),
@@ -969,8 +1290,8 @@ test("parses empty, json-like text, plain text, object, error-like, and null err
 });
 
 test("supports immediate timeout mode and upstream aborted signals", async () => {
-  const immediateClient = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const immediateClient = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     timeoutMs: 0,
     fetch: async (_input, init) => {
       assert.equal(init.signal.aborted, true);
@@ -985,8 +1306,8 @@ test("supports immediate timeout mode and upstream aborted signals", async () =>
   const abortedReason = new Error("aborted-before-send");
   aborted.abort(abortedReason);
 
-  const abortedClient = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const abortedClient = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     timeoutMs: 0,
     fetch: async (_input, init) => {
       assert.equal(init.signal.aborted, true);
@@ -1003,8 +1324,8 @@ test("reuses an already-aborted upstream signal in normal timeout mode", async (
   const reason = new Error("already-aborted");
   controller.abort(reason);
 
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     timeoutMs: 100,
     fetch: async (_input, init) => {
       assert.equal(init.signal.aborted, true);
@@ -1018,8 +1339,8 @@ test("reuses an already-aborted upstream signal in normal timeout mode", async (
 
 test("propagates upstream aborts during an in-flight request", async () => {
   const controller = new AbortController();
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     timeoutMs: 1000,
     fetch: async (_input, init) =>
       await new Promise((_resolve, reject) => {
@@ -1032,8 +1353,8 @@ test("propagates upstream aborts during an in-flight request", async () => {
 });
 
 test("aborts requests when the timeout elapses", async () => {
-  const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-    baseUrl: "https://mailer.example.com",
+  const client = new Mailer("sk_live_123", {
+    baseUrl: "https://sendstack.noria.co.ke/api/v1",
     timeoutMs: 5,
     fetch: async (_input, init) =>
       await new Promise((_resolve, reject) => {
@@ -1049,7 +1370,7 @@ test("aborts requests when the timeout elapses", async () => {
 
 test("rejects invalid absolute base urls", () => {
   assert.throws(
-    () => new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", { baseUrl: "/mailer" }),
+    () => new Mailer("sk_live_123", { baseUrl: "/sendstack" }),
     /valid absolute URL/,
   );
 });
@@ -1065,8 +1386,8 @@ test("requires a fetch implementation when the runtime has none", () => {
     });
 
     assert.throws(
-      () => new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-        baseUrl: "https://mailer.example.com",
+      () => new Mailer("sk_live_123", {
+        baseUrl: "https://sendstack.noria.co.ke/api/v1",
       }),
       /fetch implementation is required/,
     );
@@ -1079,7 +1400,7 @@ test("requires a fetch implementation when the runtime has none", () => {
   }
 });
 
-test("uses the global fetch fallback and supports email signal options", async () => {
+test("uses the global fetch fallback and supports signal options on helper methods", async () => {
   const originalFetch = globalThis.fetch;
   const signal = new AbortController().signal;
 
@@ -1087,48 +1408,29 @@ test("uses the global fetch fallback and supports email signal options", async (
     globalThis.fetch = createSequenceFetch([
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/emails/batch");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/emails/batch");
           assert.equal(init.signal.aborted, false);
         },
-        response: createJsonResponse({ data: [{ id: "email_1" }] }),
+        response: createJsonResponse({ data: [{ id: "msg_1" }] }),
       },
       {
         assert: (input, init) => {
-          assert.equal(String(input), "https://mailer.example.com/emails/email_1");
+          assert.equal(String(input), "https://sendstack.noria.co.ke/api/v1/emails/msg_1");
           assert.equal(init.signal.aborted, false);
         },
-        response: createJsonResponse({
-          object: "email",
-          id: "email_1",
-          from: "a@example.com",
-          to: ["b@example.com"],
-          subject: "Hi",
-          html: null,
-          text: "Hi",
-          cc: [],
-          bcc: [],
-          reply_to: [],
-          created_at: "2026-03-25T19:00:00.000Z",
-          scheduled_at: null,
-          sent_at: null,
-          tags: [],
-          headers: {},
-          message_id: null,
-          last_event: "sent",
-          updated_at: "2026-03-25T19:00:00.000Z",
-        }),
+        response: createJsonResponse(message()),
       },
     ]);
 
-    const client = new Mailer("mk_live_018f8c89-acde-7cc2-8a37-c7f2e051a123_secret", {
-      baseUrl: "https://mailer.example.com",
+    const client = new Mailer("sk_live_123", {
+      baseUrl: "https://sendstack.noria.co.ke/api/v1",
     });
 
     assert.deepEqual(await client.emails.sendBatch([
       { from: "a@example.com", to: "b@example.com", subject: "Hi", text: "Hi" },
-    ], { signal }), [{ id: "email_1" }]);
+    ], { signal }), [{ id: "msg_1" }]);
 
-    assert.equal((await client.emails.get("email_1", { signal })).id, "email_1");
+    assert.equal((await client.emails.get("msg_1", { signal })).id, "msg_1");
   } finally {
     globalThis.fetch = originalFetch;
   }

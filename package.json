@@ -5,6 +5,7 @@
     "comm",
     "logger",
     "mailer",
+    "sendstack",
     "noriapay",
     "storage"
   ]

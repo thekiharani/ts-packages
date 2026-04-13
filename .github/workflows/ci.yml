@@ -58,6 +58,13 @@ jobs:
                   "test_nodes": ["20", "22", "24"],
               },
               {
+                  "name": "@norialabs/sendstack",
+                  "path": "sendstack",
+                  "publish_node": "24",
+                  "tag_prefix": "sendstack",
+                  "test_nodes": ["20", "22", "24"],
+              },
+              {
                   "name": "@norialabs/mailer",
                   "path": "mailer",
                   "publish_node": "24",

@@ -1,7 +1,7 @@
 {
   "name": "@norialabs/mailer",
   "version": "0.1.2",
-  "description": "Official JavaScript SDK for the Noria Mailer API.",
+  "description": "Compatibility package for @norialabs/sendstack.",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -43,11 +43,14 @@
     "prepublishOnly": "npm run typecheck && npm run test:coverage"
   },
   "keywords": [
+    "sendstack",
+    "messaging",
     "email",
+    "sms",
+    "whatsapp",
     "mailer",
     "noria",
-    "sdk",
-    "resend-compatible"
+    "sdk"
   ],
   "author": "Noria Labs",
   "license": "MIT",
