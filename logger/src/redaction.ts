@@ -20,6 +20,14 @@ export function createRedactMatcher(
 }
 
 export function sanitizeLogValue(value: unknown, shouldRedact: RedactMatcher): unknown {
+  return sanitizeValue(value, shouldRedact, new WeakSet<object>());
+}
+
+function sanitizeValue(
+  value: unknown,
+  shouldRedact: RedactMatcher,
+  seen: WeakSet<object>,
+): unknown {
   if (value instanceof Error) {
     return {
       name: value.name,
@@ -29,16 +37,28 @@ export function sanitizeLogValue(value: unknown, shouldRedact: RedactMatcher): u
   }
 
   if (Array.isArray(value)) {
-    return value.map((entry) => sanitizeLogValue(entry, shouldRedact));
+    if (seen.has(value)) {
+      return "[Circular]";
+    }
+    seen.add(value);
+    const sanitized = value.map((entry) => sanitizeValue(entry, shouldRedact, seen));
+    seen.delete(value);
+    return sanitized;
   }
 
   if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
+    if (seen.has(value)) {
+      return "[Circular]";
+    }
+    seen.add(value);
+    const sanitized = Object.fromEntries(
       Object.entries(value).map(([key, entry]) => [
         key,
-        shouldRedact(key) ? "[REDACTED]" : sanitizeLogValue(entry, shouldRedact),
+        shouldRedact(key) ? "[REDACTED]" : sanitizeValue(entry, shouldRedact, seen),
       ]),
     );
+    seen.delete(value);
+    return sanitized;
   }
 
   return value;

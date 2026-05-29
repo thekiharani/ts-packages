@@ -73,6 +73,25 @@ test("sanitizeLogValue redacts secrets recursively", () => {
   });
 });
 
+test("sanitizeLogValue guards against circular references", () => {
+  const circularObject = { name: "node" };
+  circularObject.self = circularObject;
+
+  const circularArray = [];
+  circularArray.push(circularArray);
+
+  const sanitized = sanitizeLogValue(
+    { circularObject, circularArray, ok: "value" },
+    (key) => /password/i.test(key),
+  );
+
+  assert.deepEqual(sanitized, {
+    circularObject: { name: "node", self: "[Circular]" },
+    circularArray: ["[Circular]"],
+    ok: "value",
+  });
+});
+
 test("createRedactMatcher supports replace mode", () => {
   const matcher = createRedactMatcher({
     keys: ["session_id"],
