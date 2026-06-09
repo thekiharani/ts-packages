@@ -85,6 +85,8 @@ export interface CloudWatchLoggerConfig {
   maxBufferedEvents?: number;
   retryBaseDelayMs?: number;
   client?: CloudWatchLogsClient;
+  /** Optional per-CloudWatch-stream minimum level when used via createServiceLogger. */
+  level?: LogLevel;
 }
 
 export interface ServiceLoggerConfig {
@@ -98,7 +100,7 @@ export interface ServiceLoggerConfig {
   file?: FileLoggerConfig;
   redactKeys?: string[];
   base?: Record<string, unknown>;
-  cloudwatch?: CloudWatchLoggerConfig;
+  cloudwatch?: CloudWatchLoggerConfig | CloudWatchLoggerConfig[];
 }
 
 export interface ManagedLogger {

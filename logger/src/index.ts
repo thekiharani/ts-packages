@@ -9,6 +9,7 @@ import type {
   LoggerRuntimeContext,
   LoggerDestination,
   LoggerRedactionConfig,
+  LogLevel,
   ManagedLogger,
   ServiceLoggerConfig,
 } from "./types";
@@ -47,6 +48,7 @@ export {
 
 type ManagedDestination = {
   stream: DestinationStream;
+  level?: LogLevel;
   flush: () => Promise<void>;
   close: () => Promise<void>;
 };
@@ -64,8 +66,8 @@ export function createServiceLogger(config: ServiceLoggerConfig): ManagedLogger 
     pid: config.identity?.pid,
     serviceName: config.serviceName,
   });
-  const managedDestinations = destinations.map((destination) =>
-    createManagedDestination(destination, config, runtimeContext),
+  const managedDestinations = destinations.flatMap((destination) =>
+    createManagedDestinations(destination, config, runtimeContext),
   );
 
   const loggerOptions: LoggerOptions = {
@@ -92,12 +94,19 @@ export function createServiceLogger(config: ServiceLoggerConfig): ManagedLogger 
     },
   };
 
+  const baseLevel = config.level ?? "info";
+  const hasPerDestinationLevels = managedDestinations.some((entry) => entry.level);
   const logger =
-    managedDestinations.length === 1
+    managedDestinations.length === 1 && !hasPerDestinationLevels
       ? pino(loggerOptions, managedDestinations[0]!.stream)
       : pino(
           loggerOptions,
-          pino.multistream(managedDestinations.map((entry) => ({ stream: entry.stream }))),
+          pino.multistream(
+            managedDestinations.map((entry) => ({
+              level: entry.level ?? baseLevel,
+              stream: entry.stream,
+            })),
+          ),
         );
 
   return {
@@ -125,26 +134,31 @@ export function parseLoggerDestinations(rawValue?: string): LoggerDestination[] 
   return [...new Set(destinations)] as LoggerDestination[];
 }
 
-function createManagedDestination(
+function createManagedDestinations(
   destination: LoggerDestination,
   config: ServiceLoggerConfig,
   runtimeContext: LoggerRuntimeContext,
-): ManagedDestination {
+): ManagedDestination[] {
   switch (destination) {
     case "stdout":
-      return createPinoDestination(1);
+      return [createPinoDestination(1)];
     case "stderr":
-      return createPinoDestination(2);
+      return [createPinoDestination(2)];
     case "file":
       if (!config.file) {
         throw new Error("file logging requires file configuration.");
       }
-      return createFileDestination(config.file, runtimeContext);
+      return [createFileDestination(config.file, runtimeContext)];
     case "cloudwatch":
       if (!config.cloudwatch) {
         throw new Error("cloudwatch logging requires cloudwatch configuration.");
       }
-      return createCloudWatchDestination(config.cloudwatch, runtimeContext);
+      return (Array.isArray(config.cloudwatch) ? config.cloudwatch : [config.cloudwatch]).map(
+        (cloudwatchConfig) => {
+          const cloudwatchDestination = createCloudWatchDestination(cloudwatchConfig, runtimeContext);
+          return { ...cloudwatchDestination, level: cloudwatchConfig.level };
+        },
+      );
   }
 }
 

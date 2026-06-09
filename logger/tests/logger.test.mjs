@@ -661,6 +661,107 @@ test("cloudwatch destination creates resources and publishes batched events", as
   assert.equal(putEventsInput.logEvents.length, 2);
 });
 
+test("createServiceLogger supports multiple CloudWatch streams with per-stream levels", async () => {
+  const commands = [];
+  const client = {
+    send: async (command) => {
+      commands.push(command);
+      return {};
+    },
+  };
+
+  const loggerBundle = createServiceLogger({
+    serviceName: "test-service",
+    destinations: ["cloudwatch"],
+    cloudwatch: [
+      {
+        client,
+        region: "eu-west-1",
+        logGroupName: "group",
+        stream: { value: "logger-2024-01-01" },
+        createLogGroup: false,
+        createLogStream: false,
+        flushIntervalMs: 60_000,
+      },
+      {
+        client,
+        region: "eu-west-1",
+        logGroupName: "group",
+        stream: { value: "errors-2024-01-01" },
+        level: "error",
+        createLogGroup: false,
+        createLogStream: false,
+        flushIntervalMs: 60_000,
+      },
+    ],
+  });
+
+  loggerBundle.logger.info({ event: "one" }, "hello");
+  loggerBundle.logger.error({ event: "two" }, "world");
+  await loggerBundle.close();
+
+  const puts = commands.filter((command) => command instanceof PutLogEventsCommand);
+  assert.equal(puts.length, 2);
+
+  const allLogs = puts.find((command) => command.input.logStreamName === "logger-2024-01-01");
+  const errorLogs = puts.find((command) => command.input.logStreamName === "errors-2024-01-01");
+
+  assert.equal(allLogs.input.logEvents.length, 2);
+  assert.equal(errorLogs.input.logEvents.length, 1);
+  assert.match(errorLogs.input.logEvents[0].message, /"level":"error"/);
+  assert.match(errorLogs.input.logEvents[0].message, /"event":"two"/);
+});
+
+test("createServiceLogger honours a sub-info logger level for non-leveled streams in multistream mode", async () => {
+  const commands = [];
+  const client = {
+    send: async (command) => {
+      commands.push(command);
+      return {};
+    },
+  };
+
+  const loggerBundle = createServiceLogger({
+    serviceName: "test-service",
+    level: "debug",
+    destinations: ["cloudwatch"],
+    cloudwatch: [
+      {
+        client,
+        region: "eu-west-1",
+        logGroupName: "group",
+        stream: { value: "logger-2024-01-01" },
+        createLogGroup: false,
+        createLogStream: false,
+        flushIntervalMs: 60_000,
+      },
+      {
+        client,
+        region: "eu-west-1",
+        logGroupName: "group",
+        stream: { value: "errors-2024-01-01" },
+        level: "error",
+        createLogGroup: false,
+        createLogStream: false,
+        flushIntervalMs: 60_000,
+      },
+    ],
+  });
+
+  loggerBundle.logger.debug({ event: "trace-me" }, "low-level");
+  loggerBundle.logger.error({ event: "boom" }, "high-level");
+  await loggerBundle.close();
+
+  const puts = commands.filter((command) => command instanceof PutLogEventsCommand);
+  const allLogs = puts.find((command) => command.input.logStreamName === "logger-2024-01-01");
+  const errorLogs = puts.find((command) => command.input.logStreamName === "errors-2024-01-01");
+
+  assert.equal(allLogs.input.logEvents.length, 2);
+  assert.match(allLogs.input.logEvents[0].message, /"level":"debug"/);
+  assert.equal(errorLogs.input.logEvents.length, 1);
+  assert.match(errorLogs.input.logEvents[0].message, /"level":"error"/);
+});
+
 test("cloudwatch destination applies configured log-group retention", async () => {
   const commands = [];
   const destination = createCloudWatchDestination(

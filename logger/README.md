@@ -204,6 +204,50 @@ Rotation is based on each event timestamp, so rollover works without restarting 
 
 By default, rotating CloudWatch streams with a configured `prefix` resolve to `prefix-date-hostname`.
 
+### CloudWatch Error Stream
+
+Pass an array of CloudWatch configs to publish to multiple streams. A config-level
+`level` filters that stream only, which lets you keep all logs in `logger-*` while
+duplicating errors into `errors-*`.
+
+```ts
+import { createServiceLogger } from "@norialabs/logger";
+
+const managedLogger = createServiceLogger({
+  serviceName: "billing-api",
+  environment: "production",
+  destinations: ["stdout", "cloudwatch"],
+  cloudwatch: [
+    {
+      region: "af-south-1",
+      logGroupName: "noria_billing-prod",
+      stream: {
+        prefix: "logger",
+        rotation: "daily",
+        includeHostname: false,
+      },
+    },
+    {
+      region: "af-south-1",
+      logGroupName: "noria_billing-prod",
+      level: "error",
+      stream: {
+        prefix: "errors",
+        rotation: "daily",
+        includeHostname: false,
+      },
+    },
+  ],
+});
+```
+
+That resolves to stream names like:
+
+```text
+logger-2026-03-27
+errors-2026-03-27
+```
+
 ### CloudWatch With Explicit AWS Credentials
 
 ```ts
@@ -525,7 +569,7 @@ createServiceLogger({
   identity?: LoggerIdentityConfig;
   redact?: LoggerRedactionConfig;
   file?: FileLoggerConfig;
-  cloudwatch?: CloudWatchLoggerConfig;
+  cloudwatch?: CloudWatchLoggerConfig | CloudWatchLoggerConfig[];
   redactKeys?: string[];
   base?: Record<string, unknown>;
 });
@@ -582,6 +626,7 @@ type CloudWatchLoggerConfig = {
   region: string;
   logGroupName: string;
   stream?: TargetConfig;
+  level?: LogLevel; // optional minimum level for this CloudWatch stream
   credentials?: AwsCredentialIdentity | AwsCredentialIdentityProvider;
   retentionInDays?: number; // default: unset, package leaves retention unchanged
   client?: CloudWatchLogsClient;
