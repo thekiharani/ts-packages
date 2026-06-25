@@ -92,6 +92,54 @@ export interface SmsManagementResult {
   raw?: unknown;
 }
 
+export interface AfricasTalkingPremiumSmsRequest {
+  recipient: string;
+  text: string;
+  shortCode?: string;
+  keyword: string;
+  linkId: string;
+  retryDurationInHours?: number;
+  metadata?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface AfricasTalkingIncomingMessage {
+  provider: string;
+  providerMessageId?: string;
+  sender?: string;
+  recipient?: string;
+  text?: string;
+  linkId?: string;
+  date?: string;
+  networkCode?: string;
+  raw?: unknown;
+}
+
+export interface AfricasTalkingFetchMessagesRequest {
+  lastReceivedId?: number;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface AfricasTalkingFetchMessagesResult {
+  provider: string;
+  messages: AfricasTalkingIncomingMessage[];
+  raw?: unknown;
+}
+
+export interface AfricasTalkingSubscriptionRequest {
+  phoneNumber: string;
+  shortCode: string;
+  keyword: string;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface AfricasTalkingSubscriptionResult {
+  provider: string;
+  success: boolean;
+  description?: string;
+  raw?: unknown;
+}
+
 export interface SmsClient {
   readonly providerName: string;
   send(request: SmsSendRequest, options?: RequestOptions): Promise<SmsSendResult>;

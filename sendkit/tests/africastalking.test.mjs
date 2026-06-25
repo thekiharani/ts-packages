@@ -39,6 +39,47 @@ test("AfricasTalkingSmsClient sends grouped bulk SMS and reads balance", async (
         });
       }
 
+      if (url.includes("/messaging?")) {
+        return jsonResponse({
+          SMSMessageData: {
+            Messages: [
+              {
+                id: "inbound-1",
+                from: "+254700123456",
+                to: "22384",
+                text: "JOIN",
+                linkId: "link-1",
+                date: "2026-06-25T03:00:00.000Z",
+                networkCode: "63902",
+              },
+            ],
+          },
+        });
+      }
+
+      if (url.includes("/messaging/premium")) {
+        return jsonResponse({
+          SMSMessageData: {
+            Message: "Sent to 1/1",
+            Recipients: [
+              {
+                number: body.get("to"),
+                status: "Success",
+                statusCode: 101,
+                messageId: "premium-1",
+              },
+            ],
+          },
+        });
+      }
+
+      if (url.includes("/subscription/create") || url.includes("/subscription/delete")) {
+        return jsonResponse({
+          status: "Success",
+          description: "Queued",
+        });
+      }
+
       return jsonResponse({
         SMSMessageData: {
           Message: "Sent to 2/2 Total Cost: KES 1.6000",
@@ -79,6 +120,43 @@ test("AfricasTalkingSmsClient sends grouped bulk SMS and reads balance", async (
 
   const balance = await sms.getBalance();
   assert.equal(balance.entries[0].credits, 1024.5);
+
+  const premium = await sms.sendPremium({
+    recipient: "+254733333333",
+    text: "Premium response",
+    shortCode: "22384",
+    keyword: "NORIA",
+    linkId: "link-1",
+    retryDurationInHours: 2,
+  });
+  assert.equal(premium.messages[0].providerMessageId, "premium-1");
+  assert.equal(calls[3].body.get("from"), "22384");
+  assert.equal(calls[3].body.get("keyword"), "NORIA");
+  assert.equal(calls[3].body.get("linkId"), "link-1");
+  assert.equal(calls[3].body.get("retryDurationInHours"), "2");
+
+  const inbox = await sms.fetchMessages({ lastReceivedId: 42 });
+  assert.equal(inbox.messages[0].providerMessageId, "inbound-1");
+  assert.equal(inbox.messages[0].sender, "+254700123456");
+  assert.equal(inbox.messages[0].recipient, "22384");
+  assert.equal(inbox.messages[0].linkId, "link-1");
+  assert.equal(inbox.messages[0].text, "JOIN");
+  assert.match(calls[4].url, /lastReceivedId=42/);
+
+  const created = await sms.createSubscription({
+    phoneNumber: "+254700123456",
+    shortCode: "22384",
+    keyword: "NORIA",
+  });
+  assert.equal(created.success, true);
+  assert.equal(calls[5].body.get("phoneNumber"), "+254700123456");
+
+  const deleted = await sms.deleteSubscription({
+    phoneNumber: "+254700123456",
+    shortCode: "22384",
+    keyword: "NORIA",
+  });
+  assert.equal(deleted.description, "Queued");
 });
 
 test("AfricasTalkingSmsClient parses delivery reports", () => {
