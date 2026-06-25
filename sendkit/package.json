@@ -1,6 +1,6 @@
 {
   "name": "@norialabs/sendkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Modular TypeScript/JavaScript SDK for WhatsApp and bulk SMS gateways.",
   "type": "module",
   "sideEffects": false,
