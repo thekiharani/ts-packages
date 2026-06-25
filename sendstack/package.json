@@ -1,11 +1,12 @@
 {
   "name": "@norialabs/sendstack",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Official JavaScript SDK for Sendstack messaging APIs.",
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "README.md",
     "LICENSE"
   ],
@@ -36,10 +37,12 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --sourcemap --clean --target node20 --out-dir dist",
+    "build:dist": "tsup src/index.ts --format esm --dts --clean --target node20 --out-dir dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/test.mjs",
     "test:run": "npm run build && node scripts/run-node-tests.mjs",
     "test:coverage": "npm run build && c8 --all --src dist --exclude scripts/** --reporter=text --check-coverage --lines 100 --functions 100 --branches 100 node scripts/run-node-tests.mjs",
+    "prepack": "npm run build:dist",
     "prepublishOnly": "npm run typecheck && npm run test:coverage"
   },
   "keywords": [
