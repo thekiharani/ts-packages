@@ -6,8 +6,14 @@ import { coerceInt, coerceNumber, coerceString, firstString } from "../../core/u
 import type { DeliveryEvent } from "../../events";
 import type {
   AfricasTalkingDeliveryReport,
+  AfricasTalkingFetchMessagesRequest,
+  AfricasTalkingFetchMessagesResult,
+  AfricasTalkingIncomingMessage,
+  AfricasTalkingPremiumSmsRequest,
   AfricasTalkingSmsClientOptions,
   AfricasTalkingSmsFromEnvOptions,
+  AfricasTalkingSubscriptionRequest,
+  AfricasTalkingSubscriptionResult,
   SmsBalance,
   SmsClient,
   SmsMessage,
@@ -107,6 +113,75 @@ export class AfricasTalkingSmsClient implements SmsClient {
     };
   }
 
+  async sendPremium(
+    request: AfricasTalkingPremiumSmsRequest,
+    options?: RequestOptions,
+  ): Promise<SmsSendResult> {
+    const response = await this.request("/messaging/premium", "POST", {
+      body: this.buildPremiumPayload(request),
+      options,
+    });
+    const message: SmsMessage = {
+      recipient: request.recipient,
+      text: request.text,
+      metadata: request.metadata,
+    };
+    const receipts = buildSendReceipts(this.providerName, [message], response);
+
+    return {
+      provider: this.providerName,
+      accepted: receipts.some((receipt) => receipt.status === "submitted"),
+      messages: receipts,
+      submittedCount: receipts.filter((receipt) => receipt.status === "submitted").length,
+      failedCount: receipts.filter((receipt) => receipt.status === "failed").length,
+      raw: response,
+    };
+  }
+
+  async fetchMessages(
+    request: AfricasTalkingFetchMessagesRequest = {},
+    options?: RequestOptions,
+  ): Promise<AfricasTalkingFetchMessagesResult> {
+    const response = await this.request("/messaging", "GET", {
+      query: {
+        username: this.username,
+        lastReceivedId: request.lastReceivedId,
+        ...normalizeQueryOptions(request.providerOptions),
+      },
+      options,
+    });
+
+    return {
+      provider: this.providerName,
+      messages: buildIncomingMessages(this.providerName, response),
+      raw: response,
+    };
+  }
+
+  async createSubscription(
+    request: AfricasTalkingSubscriptionRequest,
+    options?: RequestOptions,
+  ): Promise<AfricasTalkingSubscriptionResult> {
+    const response = await this.request("/subscription/create", "POST", {
+      body: this.buildSubscriptionPayload(request),
+      options,
+    });
+
+    return buildSubscriptionResult(this.providerName, response);
+  }
+
+  async deleteSubscription(
+    request: AfricasTalkingSubscriptionRequest,
+    options?: RequestOptions,
+  ): Promise<AfricasTalkingSubscriptionResult> {
+    const response = await this.request("/subscription/delete", "POST", {
+      body: this.buildSubscriptionPayload(request),
+      options,
+    });
+
+    return buildSubscriptionResult(this.providerName, response);
+  }
+
   parseDeliveryReport(payload: Record<string, unknown>): DeliveryEvent | null {
     const report = parseAfricasTalkingDeliveryReport(payload);
 
@@ -170,6 +245,50 @@ export class AfricasTalkingSmsClient implements SmsClient {
     if (senderId) {
       params.set("from", senderId);
     }
+
+    for (const [key, value] of Object.entries(request.providerOptions ?? {})) {
+      if (value !== undefined && value !== null) {
+        params.set(key, String(value));
+      }
+    }
+
+    return params;
+  }
+
+  private buildPremiumPayload(request: AfricasTalkingPremiumSmsRequest): URLSearchParams {
+    const senderId = firstString(request.shortCode, this.defaultSenderId);
+    const params = new URLSearchParams();
+
+    params.set("username", this.username);
+    params.set("to", requireText(request.recipient, "recipient"));
+    params.set("message", requireText(request.text, "text"));
+    params.set("keyword", requireText(request.keyword, "keyword"));
+    params.set("linkId", requireText(request.linkId, "linkId"));
+
+    if (senderId) {
+      params.set("from", senderId);
+    }
+
+    if (request.retryDurationInHours !== undefined) {
+      params.set("retryDurationInHours", String(request.retryDurationInHours));
+    }
+
+    for (const [key, value] of Object.entries(request.providerOptions ?? {})) {
+      if (value !== undefined && value !== null) {
+        params.set(key, String(value));
+      }
+    }
+
+    return params;
+  }
+
+  private buildSubscriptionPayload(request: AfricasTalkingSubscriptionRequest): URLSearchParams {
+    const params = new URLSearchParams();
+
+    params.set("username", this.username);
+    params.set("phoneNumber", requireText(request.phoneNumber, "phoneNumber"));
+    params.set("shortCode", requireText(request.shortCode, "shortCode"));
+    params.set("keyword", requireText(request.keyword, "keyword"));
 
     for (const [key, value] of Object.entries(request.providerOptions ?? {})) {
       if (value !== undefined && value !== null) {
@@ -272,7 +391,12 @@ function validateResponse(
     });
   }
 
-  if (response["SMSMessageData"] !== undefined || response["UserData"] !== undefined) {
+  if (
+    response["SMSMessageData"] !== undefined
+    || response["UserData"] !== undefined
+    || response["status"] !== undefined
+    || response["description"] !== undefined
+  ) {
     return response;
   }
 
@@ -280,6 +404,63 @@ function validateResponse(
     provider: providerName,
     responseBody: response,
   });
+}
+
+function buildIncomingMessages(
+  providerName: string,
+  response: Record<string, unknown>,
+): AfricasTalkingIncomingMessage[] {
+  const data = toRecord(response["SMSMessageData"]);
+  const rows = normalizeRows(data["Messages"]);
+
+  return rows.map((row) => ({
+    provider: providerName,
+    providerMessageId: coerceString(row["id"]),
+    sender: firstString(row["from"], row["sender"]),
+    recipient: coerceString(row["to"]),
+    text: firstString(row["text"], row["message"]),
+    linkId: coerceString(row["linkId"]),
+    date: firstString(row["date"], row["dateReceived"]),
+    networkCode: coerceString(row["networkCode"]),
+    raw: row,
+  }));
+}
+
+function buildSubscriptionResult(
+  providerName: string,
+  response: Record<string, unknown>,
+): AfricasTalkingSubscriptionResult {
+  const status = coerceString(response["status"]);
+  const description = firstString(response["description"], response["message"]);
+
+  return {
+    provider: providerName,
+    success: status ? status.toLowerCase() === "success" : true,
+    description,
+    raw: response,
+  };
+}
+
+function normalizeQueryOptions(
+  options?: Record<string, unknown>,
+): Record<string, string | number | boolean | null | undefined> {
+  const query: Record<string, string | number | boolean | null | undefined> = {};
+
+  for (const [key, value] of Object.entries(options ?? {})) {
+    if (
+      value === undefined
+      || value === null
+      || typeof value === "string"
+      || typeof value === "number"
+      || typeof value === "boolean"
+    ) {
+      query[key] = value;
+    } else {
+      query[key] = String(value);
+    }
+  }
+
+  return query;
 }
 
 function isSubmittedStatus(statusCode: unknown, status?: string): boolean {
