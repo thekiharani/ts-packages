@@ -256,6 +256,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate npm publish token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::error::Missing npm publish token. Add NPM_TOKEN as a GitHub Actions secret or npm environment secret."
+            exit 1
+          fi
+
       - name: Determine release version
         id: release
         env:
@@ -409,19 +420,27 @@ jobs:
         if: steps.release.outputs.should_publish == 'true'
         working-directory: ${{ matrix.package.path }}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          npm config set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::error::Missing npm publish token. Add NPM_TOKEN as a GitHub Actions secret or npm environment secret."
+            exit 1
+          fi
+          printf '//registry.npmjs.org/:_authToken=%s\n' "${NPM_TOKEN}" > "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
           npm publish --provenance --access public
 
       - name: Deprecate old comm package
         if: steps.release.outputs.should_publish == 'true' && matrix.package.name == '@norialabs/sendkit'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          npm config set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::error::Missing npm publish token. Add NPM_TOKEN as a GitHub Actions secret or npm environment secret."
+            exit 1
+          fi
+          printf '//registry.npmjs.org/:_authToken=%s\n' "${NPM_TOKEN}" > "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
           npm deprecate @norialabs/comm "Renamed to @norialabs/sendkit. Please install @norialabs/sendkit instead."
