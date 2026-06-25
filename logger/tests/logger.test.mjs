@@ -712,6 +712,58 @@ test("createServiceLogger supports multiple CloudWatch streams with per-stream l
   assert.match(errorLogs.input.logEvents[0].message, /"event":"two"/);
 });
 
+test("createServiceLogger dedupe routes each level to a single CloudWatch stream", async () => {
+  const commands = [];
+  const client = {
+    send: async (command) => {
+      commands.push(command);
+      return {};
+    },
+  };
+
+  const loggerBundle = createServiceLogger({
+    serviceName: "test-service",
+    destinations: ["cloudwatch"],
+    dedupe: true,
+    cloudwatch: [
+      {
+        client,
+        region: "eu-west-1",
+        logGroupName: "group",
+        stream: { value: "logger-2024-01-01" },
+        createLogGroup: false,
+        createLogStream: false,
+        flushIntervalMs: 60_000,
+      },
+      {
+        client,
+        region: "eu-west-1",
+        logGroupName: "group",
+        stream: { value: "errors-2024-01-01" },
+        level: "error",
+        createLogGroup: false,
+        createLogStream: false,
+        flushIntervalMs: 60_000,
+      },
+    ],
+  });
+
+  loggerBundle.logger.info({ event: "one" }, "hello");
+  loggerBundle.logger.error({ event: "two" }, "world");
+  await loggerBundle.close();
+
+  const puts = commands.filter((command) => command instanceof PutLogEventsCommand);
+  const allLogs = puts.find((command) => command.input.logStreamName === "logger-2024-01-01");
+  const errorLogs = puts.find((command) => command.input.logStreamName === "errors-2024-01-01");
+
+  // With dedupe, info goes ONLY to logger-* and error goes ONLY to error-*.
+  assert.equal(allLogs.input.logEvents.length, 1);
+  assert.match(allLogs.input.logEvents[0].message, /"level":"info"/);
+  assert.equal(errorLogs.input.logEvents.length, 1);
+  assert.match(errorLogs.input.logEvents[0].message, /"level":"error"/);
+  assert.doesNotMatch(allLogs.input.logEvents[0].message, /"level":"error"/);
+});
+
 test("createServiceLogger honours a sub-info logger level for non-leveled streams in multistream mode", async () => {
   const commands = [];
   const client = {

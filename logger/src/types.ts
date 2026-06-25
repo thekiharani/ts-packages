@@ -101,6 +101,16 @@ export interface ServiceLoggerConfig {
   redactKeys?: string[];
   base?: Record<string, unknown>;
   cloudwatch?: CloudWatchLoggerConfig | CloudWatchLoggerConfig[];
+  /**
+   * Route each record to a single destination instead of every destination
+   * whose level is at or below the record's level. When true, a record is
+   * written only to the destination with the HIGHEST `level` that still accepts
+   * it (pino multistream dedupe). Combined with per-destination `level`, this
+   * sends each level band to its own stream/file - e.g. a `logger-*` stream at
+   * `info` and an `error-*` stream at `error` means errors land ONLY in
+   * `error-*`, never duplicated into `logger-*`. Default false.
+   */
+  dedupe?: boolean;
 }
 
 export interface ManagedLogger {

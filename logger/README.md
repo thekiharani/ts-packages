@@ -248,6 +248,29 @@ logger-2026-03-27
 errors-2026-03-27
 ```
 
+By default every stream whose `level` is at or below a record's level receives it,
+so the example above writes errors to **both** `logger-*` and `errors-*`. Set
+`dedupe: true` to instead route each record to a single stream - the one with the
+highest `level` that still accepts it. With the streams above, that keeps
+`info`/`warn` in `logger-*` and sends `error`/`fatal` **only** to `errors-*`:
+
+```ts
+const managedLogger = createServiceLogger({
+  serviceName: "billing-api",
+  environment: "production",
+  destinations: ["cloudwatch"],
+  dedupe: true,
+  cloudwatch: [
+    { region: "af-south-1", logGroupName: "noria_billing-prod", stream: { prefix: "logger", rotation: "daily" } },
+    { region: "af-south-1", logGroupName: "noria_billing-prod", level: "error", stream: { prefix: "errors", rotation: "daily" } },
+  ],
+});
+```
+
+The same pattern generalizes to any number of streams (or files), letting each
+level band land in its own destination. Note: with `dedupe` enabled, give streams
+distinct `level` values - destinations that share a level are treated as one bucket.
+
 ### CloudWatch With Explicit AWS Credentials
 
 ```ts

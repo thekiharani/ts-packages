@@ -96,8 +96,9 @@ export function createServiceLogger(config: ServiceLoggerConfig): ManagedLogger 
 
   const baseLevel = config.level ?? "info";
   const hasPerDestinationLevels = managedDestinations.some((entry) => entry.level);
+  const dedupe = config.dedupe ?? false;
   const logger =
-    managedDestinations.length === 1 && !hasPerDestinationLevels
+    managedDestinations.length === 1 && !hasPerDestinationLevels && !dedupe
       ? pino(loggerOptions, managedDestinations[0]!.stream)
       : pino(
           loggerOptions,
@@ -106,6 +107,7 @@ export function createServiceLogger(config: ServiceLoggerConfig): ManagedLogger 
               level: entry.level ?? baseLevel,
               stream: entry.stream,
             })),
+            { dedupe },
           ),
         );
 
