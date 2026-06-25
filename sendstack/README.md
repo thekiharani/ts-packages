@@ -58,13 +58,13 @@ const sendstack = new Sendstack({
 });
 ```
 
-## Docs Split
+## Documentation
 
-This README is the package guide: install, initialization, SDK methods, TypeScript names, request options, errors, and examples.
+This package guide covers install, initialization, SDK methods, TypeScript names, request options, errors, and examples.
 
-The SaaS docs should remain the canonical source for product/API behavior: account setup, API tokens, domain verification, DNS records, webhook event catalogs, deliverability concepts, provider behavior, dashboard workflows, and raw HTTP API reference.
+Complete SendStack SaaS docs: [`https://sendstack.norialabs.com/docs`](https://sendstack.norialabs.com/docs).
 
-Current live SaaS docs are at `https://mailer.norialabs.com/api/docs`. The old `/docs` path currently returns 404.
+Use the SaaS docs as the canonical source for product/API behavior: account setup, API tokens, domain verification, DNS records, webhook event catalogs, deliverability concepts, provider behavior, dashboard workflows, and raw HTTP API reference.
 
 ## Auth
 
