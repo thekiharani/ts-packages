@@ -486,7 +486,7 @@ export interface WhatsAppInboundMessage {
   raw?: unknown;
 }
 
-export interface WhatsAppGateway {
+export interface WhatsAppClient {
   readonly providerName: string;
   sendText(request: WhatsAppTextRequest, options?: RequestOptions): Promise<WhatsAppSendResult>;
   sendTemplate(
@@ -534,7 +534,7 @@ export interface WhatsAppGateway {
   close?(): Promise<void> | void;
 }
 
-export interface WhatsAppTemplateManagementGateway extends WhatsAppGateway {
+export interface WhatsAppTemplateManagementClient extends WhatsAppClient {
   listTemplates(
     request?: WhatsAppTemplateListRequest,
     options?: RequestOptions,
@@ -559,7 +559,7 @@ export interface WhatsAppTemplateManagementGateway extends WhatsAppGateway {
   ): Promise<WhatsAppTemplateDeleteResult>;
 }
 
-export interface MetaWhatsAppGatewayOptions {
+export interface MetaWhatsAppClientOptions {
   accessToken: string;
   phoneNumberId: string;
   whatsappBusinessAccountId?: string;

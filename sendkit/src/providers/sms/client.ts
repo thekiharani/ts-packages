@@ -1,18 +1,18 @@
 import { getEnvNumber, getOptionalEnv, getRequiredEnv } from "../../core/config";
-import { ConfigurationError, GatewayError } from "../../core/errors";
+import { ConfigurationError, ProviderError } from "../../core/errors";
 import { HttpClient } from "../../core/http";
 import type { RequestOptions } from "../../core/types";
 import { coerceBoolean, coerceInt, coerceNumber, coerceString, firstString, formatScheduleTime } from "../../core/utils";
 import type { DeliveryEvent } from "../../events";
 import type {
   OnfonSmsFromEnvOptions,
-  OnfonSmsGatewayOptions,
+  OnfonSmsClientOptions,
   SmsBalance,
   SmsBalanceEntry,
-  SmsGateway,
+  SmsClient,
   SmsGroup,
   SmsGroupUpsertRequest,
-  SmsManagementGateway,
+  SmsManagementClient,
   SmsManagementResult,
   SmsMessage,
   SmsSendReceipt,
@@ -25,12 +25,12 @@ import type {
 export const ONFON_SMS_BASE_URL = "https://api.onfonmedia.co.ke/v1/sms";
 export const ONFON_BASE_URL = ONFON_SMS_BASE_URL;
 
-export class OnfonSmsGateway implements SmsManagementGateway {
-  static fromEnv(options: OnfonSmsFromEnvOptions = {}): OnfonSmsGateway {
+export class OnfonSmsClient implements SmsManagementClient {
+  static fromEnv(options: OnfonSmsFromEnvOptions = {}): OnfonSmsClient {
     const prefix = options.prefix ?? "ONFON_";
     const env = options.env;
 
-    return new OnfonSmsGateway({
+    return new OnfonSmsClient({
       accessKey: getRequiredEnv(`${prefix}ACCESS_KEY`, env),
       apiKey: getRequiredEnv(`${prefix}API_KEY`, env),
       clientId: getRequiredEnv(`${prefix}CLIENT_ID`, env),
@@ -50,7 +50,7 @@ export class OnfonSmsGateway implements SmsManagementGateway {
   private readonly defaultSenderId?: string;
   private readonly http: HttpClient;
 
-  constructor(options: OnfonSmsGatewayOptions) {
+  constructor(options: OnfonSmsClientOptions) {
     const accessKey = requireText(options.accessKey, "accessKey");
     this.apiKey = requireText(options.apiKey, "apiKey");
     this.clientId = requireText(options.clientId, "clientId");
@@ -319,8 +319,6 @@ export class OnfonSmsGateway implements SmsManagementGateway {
   }
 }
 
-export { OnfonSmsGateway as OnfonGateway };
-
 function validateSendRequest(request: SmsSendRequest): void {
   if (!request.messages.length) {
     throw new Error("SmsSendRequest.messages must not be empty.");
@@ -460,7 +458,7 @@ function validateResponse(
   response: Record<string, unknown>,
 ): Record<string, unknown> {
   if (!Object.keys(response).length) {
-    throw new GatewayError("Onfon returned a non-object response.", {
+    throw new ProviderError("Onfon returned a non-object response.", {
       provider: providerName,
       responseBody: response,
     });
@@ -470,7 +468,7 @@ function validateResponse(
     const errorCode = normalizeErrorCode(response["ErrorCode"]);
     const errorDescription = coerceString(response["ErrorDescription"]) ?? "Provider request failed.";
 
-    throw new GatewayError(`Onfon request failed: ${errorDescription}`, {
+    throw new ProviderError(`Onfon request failed: ${errorDescription}`, {
       provider: providerName,
       errorCode,
       errorDescription,

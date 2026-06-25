@@ -16,21 +16,34 @@ export type {
 export {
   ApiError,
   ConfigurationError,
-  GatewayError,
   NetworkError,
-  NoriaMessagingError,
-  NoriaSmsError,
+  ProviderError,
+  SendKitError,
   TimeoutError,
   WebhookVerificationError,
 } from "./core/errors";
 export type { DeliveryEvent, DeliveryState, MessageChannel } from "./events";
-export { MessagingClient, SmsService, WhatsAppService } from "./client";
-export { ONFON_BASE_URL, ONFON_SMS_BASE_URL, OnfonGateway, OnfonSmsGateway } from "./providers/sms/client";
+export {
+  ONFON_BASE_URL,
+  ONFON_SMS_BASE_URL,
+  OnfonSmsClient,
+} from "./providers/sms/client";
+export {
+  AFRICASTALKING_SANDBOX_SMS_BASE_URL,
+  AFRICASTALKING_SMS_BASE_URL,
+  AfricasTalkingSmsClient,
+  parseAfricasTalkingDeliveryReport,
+} from "./providers/sms/africastalking";
 export type * from "./providers/sms/types";
-export { META_GRAPH_API_VERSION, META_GRAPH_BASE_URL, MetaWhatsAppGateway } from "./providers/whatsapp/client";
+export {
+  META_GRAPH_API_VERSION,
+  META_GRAPH_BASE_URL,
+  MetaWhatsAppClient,
+} from "./providers/whatsapp/client";
 export type * from "./providers/whatsapp/types";
 export {
   parseOnfonDeliveryReport,
+  parseAfricasTalkingSmsDeliveryReport,
   requireValidMetaSignature,
   resolveMetaSubscriptionChallenge,
   verifyMetaSignature,

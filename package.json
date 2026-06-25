@@ -2,7 +2,7 @@
   "name": "noria-ts",
   "private": true,
   "workspaces": [
-    "comm",
+    "sendkit",
     "logger",
     "sendstack",
     "noriapay",

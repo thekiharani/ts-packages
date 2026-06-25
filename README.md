@@ -4,7 +4,7 @@ TypeScript package monorepo for Noria Labs.
 
 Published packages:
 
-- `@norialabs/comm`: SMS and WhatsApp messaging SDK for Onfon and Meta Cloud API
+- `@norialabs/sendkit`: modular WhatsApp and bulk SMS SDK for Meta, Onfon, and Africa's Talking
 - `@norialabs/logger`: structured JSON logging for Node.js services
 - `@norialabs/sendstack`: JavaScript SDK for Sendstack email, SMS, WhatsApp, and merchant messaging APIs
 - `@norialabs/payments`: payments SDK for M-PESA Daraja, SasaPay, and Paystack
@@ -15,14 +15,14 @@ Quick install examples:
 ```bash
 npm install @norialabs/logger
 npm install @norialabs/sendstack
-npm install @norialabs/comm
+npm install @norialabs/sendkit
 npm install @norialabs/payments
 npm install @norialabs/storage
 ```
 
 Repo layout:
 
-- `comm/` -> `@norialabs/comm`
+- `sendkit/` -> `@norialabs/sendkit`
 - `logger/` -> `@norialabs/logger`
 - `sendstack/` -> `@norialabs/sendstack`
 - `noriapay/` -> `@norialabs/payments`

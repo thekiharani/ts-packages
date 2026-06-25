@@ -3,7 +3,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { ConfigurationError, WebhookVerificationError } from "./core/errors";
 import { coerceString, normalizeQueryMapping } from "./core/utils";
 import type { DeliveryEvent } from "./events";
-import type { SmsGateway } from "./providers/sms/types";
+import { parseAfricasTalkingDeliveryReport } from "./providers/sms/africastalking";
+import type { SmsClient } from "./providers/sms/types";
 
 type RawBody = string | ArrayBuffer | ArrayBufferView;
 
@@ -68,9 +69,57 @@ export function requireValidMetaSignature(
 
 export function parseOnfonDeliveryReport(
   queryParams: Record<string, unknown>,
-  gateway: SmsGateway,
+  client: SmsClient,
 ): DeliveryEvent | null {
-  return gateway.parseDeliveryReport(queryParams);
+  return client.parseDeliveryReport(queryParams);
+}
+
+export function parseAfricasTalkingSmsDeliveryReport(
+  queryParams: Record<string, unknown>,
+  client?: SmsClient,
+): DeliveryEvent | null {
+  if (client) {
+    return client.parseDeliveryReport(queryParams);
+  }
+
+  const report = parseAfricasTalkingDeliveryReport(queryParams);
+
+  if (!report.id) {
+    return null;
+  }
+
+  return {
+    channel: "sms",
+    provider: "africastalking",
+    providerMessageId: report.id,
+    recipient: report.phoneNumber,
+    state: mapAfricasTalkingState(report.status),
+    providerStatus: report.status,
+    errorCode: report.failureReason,
+    metadata: {
+      networkCode: report.networkCode,
+      retryCount: report.retryCount,
+    },
+    raw: report.raw,
+  };
+}
+
+function mapAfricasTalkingState(status?: string): DeliveryEvent["state"] {
+  const normalized = (status ?? "").toLowerCase();
+
+  if (["sent", "submitted"].includes(normalized)) {
+    return "submitted";
+  }
+
+  if (["success", "delivered"].includes(normalized)) {
+    return "delivered";
+  }
+
+  if (["queued", "failed"].includes(normalized)) {
+    return normalized as DeliveryEvent["state"];
+  }
+
+  return "unknown";
 }
 
 function toBuffer(value: RawBody): Buffer {

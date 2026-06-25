@@ -1,6 +1,6 @@
-# `@norialabs/comm`
+# `@norialabs/sendkit`
 
-TypeScript/JavaScript SDK for Onfon SMS and Meta WhatsApp messaging.
+Modular TypeScript/JavaScript SDK for WhatsApp and bulk SMS providers.
 
 Node `>=20` is required.
 
@@ -9,13 +9,14 @@ Designed for Node.js services, workers, and serverless messaging flows.
 ## Install
 
 ```bash
-npm install @norialabs/comm
+npm install @norialabs/sendkit
 ```
 
 ## What This Package Gives You
 
-- one package for SMS and WhatsApp messaging workflows
+- one package for WhatsApp and bulk SMS client wrappers
 - Onfon SMS send, balance, groups, templates, and delivery report parsing
+- Africa's Talking SMS send, balance, and delivery report parsing
 - Meta WhatsApp text, template, media, location, contacts, reaction, interactive, catalog, product, product-list, and flow sends
 - Meta WhatsApp template management and media upload helpers
 - reusable fetch-based transport with retries, hooks, and typed errors
@@ -23,37 +24,56 @@ npm install @norialabs/comm
 
 ## Quick Start
 
+### WhatsApp only
+
 ```ts
-import { MessagingClient, OnfonSmsGateway, MetaWhatsAppGateway } from "@norialabs/comm";
+import { MetaWhatsAppClient } from "@norialabs/sendkit/whatsapp";
 
-const messaging = new MessagingClient({
-  sms: new OnfonSmsGateway({
-    accessKey: process.env.ONFON_ACCESS_KEY!,
-    apiKey: process.env.ONFON_API_KEY!,
-    clientId: process.env.ONFON_CLIENT_ID!,
-    defaultSenderId: "NORIALABS",
-  }),
-  whatsapp: new MetaWhatsAppGateway({
-    accessToken: process.env.META_WHATSAPP_ACCESS_TOKEN!,
-    phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID!,
-    whatsappBusinessAccountId: process.env.META_WHATSAPP_WHATSAPP_BUSINESS_ACCOUNT_ID!,
-  }),
+const whatsapp = new MetaWhatsAppClient({
+  accessToken: process.env.META_WHATSAPP_ACCESS_TOKEN!,
+  phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID!,
 });
 
-await messaging.sms.send({
-  senderId: "NORIALABS",
-  messages: [
-    {
-      recipient: "254700123456",
-      text: "Your OTP is 123456",
-      reference: "otp-1",
-    },
-  ],
-});
-
-await messaging.whatsapp.sendText({
+await whatsapp.sendText({
   recipient: "254700123456",
   text: "Hello from Noria",
+});
+```
+
+### Onfon SMS only
+
+```ts
+import { OnfonSmsClient } from "@norialabs/sendkit/sms/onfon";
+
+const sms = new OnfonSmsClient({
+  accessKey: process.env.ONFON_ACCESS_KEY!,
+  apiKey: process.env.ONFON_API_KEY!,
+  clientId: process.env.ONFON_CLIENT_ID!,
+  defaultSenderId: "NORIALABS",
+});
+
+await sms.send({
+  messages: [
+    { recipient: "254700123456", text: "Your OTP is 123456", reference: "otp-1" },
+  ],
+});
+```
+
+### Africa's Talking SMS only
+
+```ts
+import { AfricasTalkingSmsClient } from "@norialabs/sendkit/sms/africastalking";
+
+const sms = new AfricasTalkingSmsClient({
+  apiKey: process.env.AFRICASTALKING_API_KEY!,
+  username: process.env.AFRICASTALKING_USERNAME!,
+  defaultSenderId: "NORIALABS",
+});
+
+await sms.send({
+  messages: [
+    { recipient: "+254700123456", text: "Your OTP is 123456", reference: "otp-1" },
+  ],
 });
 ```
 
@@ -61,30 +81,31 @@ await messaging.whatsapp.sendText({
 
 ```ts
 import {
-  MessagingClient,
-  OnfonSmsGateway,
-  MetaWhatsAppGateway,
+  OnfonSmsClient,
+  AfricasTalkingSmsClient,
+  MetaWhatsAppClient,
   resolveMetaSubscriptionChallenge,
   verifyMetaSignature,
-} from "@norialabs/comm";
+} from "@norialabs/sendkit";
 ```
 
 Subpath exports:
 
 ```ts
-import { OnfonSmsGateway } from "@norialabs/comm/sms";
-import { MetaWhatsAppGateway } from "@norialabs/comm/whatsapp";
-import { resolveMetaSubscriptionChallenge } from "@norialabs/comm/webhooks";
+import { OnfonSmsClient } from "@norialabs/sendkit/sms/onfon";
+import { AfricasTalkingSmsClient } from "@norialabs/sendkit/sms/africastalking";
+import { MetaWhatsAppClient } from "@norialabs/sendkit/whatsapp";
+import { resolveMetaSubscriptionChallenge } from "@norialabs/sendkit/webhooks";
 ```
 
 ## SMS
 
-### Onfon gateway construction
+### Onfon client construction
 
 ```ts
-import { OnfonSmsGateway } from "@norialabs/comm";
+import { OnfonSmsClient } from "@norialabs/sendkit/sms/onfon";
 
-const sms = new OnfonSmsGateway({
+const sms = new OnfonSmsClient({
   accessKey: process.env.ONFON_ACCESS_KEY!,
   apiKey: process.env.ONFON_API_KEY!,
   clientId: process.env.ONFON_CLIENT_ID!,
@@ -95,7 +116,7 @@ const sms = new OnfonSmsGateway({
 ### Environment construction
 
 ```ts
-const sms = OnfonSmsGateway.fromEnv();
+const sms = OnfonSmsClient.fromEnv();
 ```
 
 Supported env vars:
@@ -147,12 +168,12 @@ const report = sms.parseDeliveryReport({
 
 ## WhatsApp
 
-### Meta gateway construction
+### Meta client construction
 
 ```ts
-import { MetaWhatsAppGateway } from "@norialabs/comm";
+import { MetaWhatsAppClient } from "@norialabs/sendkit/whatsapp";
 
-const whatsapp = new MetaWhatsAppGateway({
+const whatsapp = new MetaWhatsAppClient({
   accessToken: process.env.META_WHATSAPP_ACCESS_TOKEN!,
   phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID!,
   whatsappBusinessAccountId: process.env.META_WHATSAPP_WHATSAPP_BUSINESS_ACCOUNT_ID!,
@@ -164,7 +185,7 @@ const whatsapp = new MetaWhatsAppGateway({
 ### Environment construction
 
 ```ts
-const whatsapp = MetaWhatsAppGateway.fromEnv();
+const whatsapp = MetaWhatsAppClient.fromEnv();
 ```
 
 Supported env vars:
@@ -305,7 +326,7 @@ const inboundMessages = whatsapp.parseInboundMessages(metaWebhookPayload);
 ### Resolve Meta subscription challenge
 
 ```ts
-import { resolveMetaSubscriptionChallenge } from "@norialabs/comm/webhooks";
+import { resolveMetaSubscriptionChallenge } from "@norialabs/sendkit/webhooks";
 
 const challenge = resolveMetaSubscriptionChallenge(
   {
@@ -320,7 +341,7 @@ const challenge = resolveMetaSubscriptionChallenge(
 ### Verify Meta signature
 
 ```ts
-import { requireValidMetaSignature } from "@norialabs/comm/webhooks";
+import { requireValidMetaSignature } from "@norialabs/sendkit/webhooks";
 
 requireValidMetaSignature(rawBody, req.headers["x-hub-signature-256"], appSecret);
 ```
@@ -328,14 +349,14 @@ requireValidMetaSignature(rawBody, req.headers["x-hub-signature-256"], appSecret
 ### Parse Onfon delivery reports
 
 ```ts
-import { parseOnfonDeliveryReport } from "@norialabs/comm/webhooks";
+import { parseOnfonDeliveryReport } from "@norialabs/sendkit/webhooks";
 
-const event = parseOnfonDeliveryReport(req.query, smsGateway);
+const event = parseOnfonDeliveryReport(req.query, smsClient);
 ```
 
 ## Transport customization
 
-Both gateways support:
+Provider clients support:
 
 - custom `fetch`
 - `timeoutMs`
@@ -346,7 +367,7 @@ Both gateways support:
 Example:
 
 ```ts
-const sms = new OnfonSmsGateway({
+const sms = new OnfonSmsClient({
   accessKey: "access-key",
   apiKey: "api-key",
   clientId: "client-id",
@@ -372,8 +393,9 @@ const sms = new OnfonSmsGateway({
 Important exported errors:
 
 - `ConfigurationError`
+- `SendKitError`
 - `ApiError`
-- `GatewayError`
+- `ProviderError`
 - `NetworkError`
 - `TimeoutError`
 - `WebhookVerificationError`
@@ -387,5 +409,5 @@ Implemented today:
 
 Not implemented today:
 
-- extra SMS gateways
+- extra SMS providers
 - framework-specific webhook adapters

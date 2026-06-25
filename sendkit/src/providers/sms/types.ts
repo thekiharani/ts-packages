@@ -92,7 +92,7 @@ export interface SmsManagementResult {
   raw?: unknown;
 }
 
-export interface SmsGateway {
+export interface SmsClient {
   readonly providerName: string;
   send(request: SmsSendRequest, options?: RequestOptions): Promise<SmsSendResult>;
   getBalance(options?: RequestOptions): Promise<SmsBalance>;
@@ -100,7 +100,7 @@ export interface SmsGateway {
   close?(): Promise<void> | void;
 }
 
-export interface SmsManagementGateway extends SmsGateway {
+export interface SmsManagementClient extends SmsClient {
   listGroups(options?: RequestOptions): Promise<SmsGroup[]>;
   createGroup(request: SmsGroupUpsertRequest, options?: RequestOptions): Promise<SmsManagementResult>;
   updateGroup(
@@ -122,7 +122,7 @@ export interface SmsManagementGateway extends SmsGateway {
   deleteTemplate(templateId: string, options?: RequestOptions): Promise<SmsManagementResult>;
 }
 
-export interface OnfonSmsGatewayOptions {
+export interface OnfonSmsClientOptions {
   accessKey: string;
   apiKey: string;
   clientId: string;
@@ -144,6 +144,39 @@ export interface OnfonSmsFromEnvOptions {
   defaultHeaders?: HeadersInit;
   retry?: RetryPolicy | false;
   hooks?: Hooks;
+}
+
+export interface AfricasTalkingSmsClientOptions {
+  apiKey: string;
+  username: string;
+  defaultSenderId?: string;
+  baseUrl?: string;
+  fetch?: FetchLike;
+  timeoutMs?: number;
+  defaultHeaders?: HeadersInit;
+  retry?: RetryPolicy | false;
+  hooks?: Hooks;
+}
+
+export interface AfricasTalkingSmsFromEnvOptions {
+  prefix?: string;
+  env?: Record<string, string | undefined>;
+  baseUrl?: string;
+  fetch?: FetchLike;
+  timeoutMs?: number;
+  defaultHeaders?: HeadersInit;
+  retry?: RetryPolicy | false;
+  hooks?: Hooks;
+}
+
+export interface AfricasTalkingDeliveryReport {
+  id?: string;
+  phoneNumber?: string;
+  status?: string;
+  failureReason?: string;
+  networkCode?: string;
+  retryCount?: number;
+  raw: Record<string, unknown>;
 }
 
 export type SendSmsRequest = SmsSendRequest;

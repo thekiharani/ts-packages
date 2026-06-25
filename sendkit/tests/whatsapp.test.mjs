@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { META_GRAPH_API_VERSION, MetaWhatsAppGateway } from "../dist/index.js";
+import { META_GRAPH_API_VERSION, MetaWhatsAppClient } from "../dist/index.js";
 
-test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers", async () => {
+test("MetaWhatsAppClient supports sends, templates, media, and parsing helpers", async () => {
   const calls = [];
-  const gateway = new MetaWhatsAppGateway({
+  const client = new MetaWhatsAppClient({
     accessToken: "token",
     phoneNumberId: "123456789",
     whatsappBusinessAccountId: "9988776655",
@@ -84,7 +84,7 @@ test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers"
 
   assert.equal(META_GRAPH_API_VERSION, "v25.0");
 
-  const text = await gateway.sendText({
+  const text = await client.sendText({
     recipient: "254700123456",
     text: "hello",
     previewUrl: true,
@@ -92,7 +92,7 @@ test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers"
   assert.equal(text.messages[0].providerMessageId, "wamid.1");
   assert.equal(calls[0].url, `https://graph.facebook.com/${META_GRAPH_API_VERSION}/123456789/messages`);
 
-  const interactive = await gateway.sendInteractive({
+  const interactive = await client.sendInteractive({
     recipient: "254700123456",
     interactiveType: "button",
     bodyText: "Choose",
@@ -100,7 +100,7 @@ test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers"
   });
   assert.equal(interactive.accepted, true);
 
-  const productList = await gateway.sendProductList({
+  const productList = await client.sendProductList({
     recipient: "254700123456",
     catalogId: "catalog-1",
     header: { type: "text", text: "Featured" },
@@ -108,19 +108,19 @@ test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers"
   });
   assert.equal(productList.messages[0].providerMessageId, "wamid.1");
 
-  const flow = await gateway.sendFlow({
+  const flow = await client.sendFlow({
     recipient: "254700123456",
     flowCta: "Start",
     flowId: "flow-1",
   });
   assert.equal(flow.messages[0].providerMessageId, "wamid.1");
 
-  const templates = await gateway.listTemplates({ limit: 10 });
+  const templates = await client.listTemplates({ limit: 10 });
   assert.equal(templates.templates[0].templateId, "tmpl-1");
-  assert.equal((await gateway.getTemplate("tmpl-1")).name, "welcome");
+  assert.equal((await client.getTemplate("tmpl-1")).name, "welcome");
   assert.equal(
     (
-      await gateway.createTemplate({
+      await client.createTemplate({
         name: "welcome",
         language: "en_US",
         category: "utility",
@@ -128,19 +128,19 @@ test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers"
     ).templateId,
     "tmpl-1",
   );
-  assert.equal((await gateway.updateTemplate("tmpl-1", { category: "utility" })).success, true);
-  assert.equal((await gateway.deleteTemplate({ templateId: "tmpl-1" })).deleted, true);
+  assert.equal((await client.updateTemplate("tmpl-1", { category: "utility" })).success, true);
+  assert.equal((await client.deleteTemplate({ templateId: "tmpl-1" })).deleted, true);
 
-  const uploaded = await gateway.uploadMedia({
+  const uploaded = await client.uploadMedia({
     filename: "menu.pdf",
     mimeType: "application/pdf",
     content: Buffer.from("pdf"),
   });
   assert.equal(uploaded.mediaId, "media-1");
-  assert.equal((await gateway.getMedia("media-1")).fileSize, 42);
-  assert.equal((await gateway.deleteMedia("media-1")).deleted, true);
+  assert.equal((await client.getMedia("media-1")).fileSize, 42);
+  assert.equal((await client.deleteMedia("media-1")).deleted, true);
 
-  const events = gateway.parseEvents({
+  const events = client.parseEvents({
     entry: [
       {
         changes: [
@@ -163,7 +163,7 @@ test("MetaWhatsAppGateway supports sends, templates, media, and parsing helpers"
   assert.equal(events[0].providerMessageId, "wamid.status.1");
   assert.equal(events[0].state, "delivered");
 
-  const inbound = gateway.parseInboundMessages({
+  const inbound = client.parseInboundMessages({
     entry: [
       {
         changes: [

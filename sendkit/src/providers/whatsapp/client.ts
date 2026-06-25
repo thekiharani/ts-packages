@@ -1,12 +1,12 @@
 import { getEnvNumber, getOptionalEnv, getRequiredEnv } from "../../core/config";
-import { ConfigurationError, GatewayError } from "../../core/errors";
+import { ConfigurationError, ProviderError } from "../../core/errors";
 import { HttpClient } from "../../core/http";
 import type { RequestOptions } from "../../core/types";
 import { coerceBoolean, coerceInt, coerceNumber, coerceString, compactRecord, firstString } from "../../core/utils";
 import type { DeliveryEvent } from "../../events";
 import type {
   MetaWhatsAppFromEnvOptions,
-  MetaWhatsAppGatewayOptions,
+  MetaWhatsAppClientOptions,
   WhatsAppCatalogMessageRequest,
   WhatsAppContact,
   WhatsAppContactAddress,
@@ -17,7 +17,7 @@ import type {
   WhatsAppContactUrl,
   WhatsAppContactsRequest,
   WhatsAppFlowMessageRequest,
-  WhatsAppGateway,
+  WhatsAppClient,
   WhatsAppInboundLocation,
   WhatsAppInboundMedia,
   WhatsAppInboundMessage,
@@ -51,7 +51,7 @@ import type {
   WhatsAppTemplateListRequest,
   WhatsAppTemplateListResult,
   WhatsAppTemplateListSummary,
-  WhatsAppTemplateManagementGateway,
+  WhatsAppTemplateManagementClient,
   WhatsAppTemplateMutationResult,
   WhatsAppTemplateParameter,
   WhatsAppTemplateRequest,
@@ -64,12 +64,12 @@ export const META_GRAPH_API_VERSION = "v25.0";
 
 const MEDIA_TYPES = new Set(["image", "audio", "document", "sticker", "video"]);
 
-export class MetaWhatsAppGateway implements WhatsAppTemplateManagementGateway {
-  static fromEnv(options: MetaWhatsAppFromEnvOptions = {}): MetaWhatsAppGateway {
+export class MetaWhatsAppClient implements WhatsAppTemplateManagementClient {
+  static fromEnv(options: MetaWhatsAppFromEnvOptions = {}): MetaWhatsAppClient {
     const prefix = options.prefix ?? "META_WHATSAPP_";
     const env = options.env;
 
-    return new MetaWhatsAppGateway({
+    return new MetaWhatsAppClient({
       accessToken: getRequiredEnv(`${prefix}ACCESS_TOKEN`, env),
       phoneNumberId: getRequiredEnv(`${prefix}PHONE_NUMBER_ID`, env),
       whatsappBusinessAccountId: getOptionalEnv(`${prefix}WHATSAPP_BUSINESS_ACCOUNT_ID`, env),
@@ -93,7 +93,7 @@ export class MetaWhatsAppGateway implements WhatsAppTemplateManagementGateway {
   private readonly apiVersion: string;
   private readonly http: HttpClient;
 
-  constructor(options: MetaWhatsAppGatewayOptions) {
+  constructor(options: MetaWhatsAppClientOptions) {
     const accessToken = requireText(options.accessToken, "accessToken");
     this.phoneNumberId = requireText(options.phoneNumberId, "phoneNumberId");
     this.whatsappBusinessAccountId = coerceString(options.whatsappBusinessAccountId);
@@ -149,7 +149,7 @@ export class MetaWhatsAppGateway implements WhatsAppTemplateManagementGateway {
     const template = buildManagedTemplate(this.providerName, response);
 
     if (!template) {
-      throw new GatewayError("Meta WhatsApp template lookup did not return a template id.", {
+      throw new ProviderError("Meta WhatsApp template lookup did not return a template id.", {
         provider: this.providerName,
         responseBody: response,
       });
@@ -442,7 +442,7 @@ function buildMediaUploadResult(
   const mediaId = coerceString(response["id"]);
 
   if (!mediaId) {
-    throw new GatewayError("Meta media upload did not return a media id.", {
+    throw new ProviderError("Meta media upload did not return a media id.", {
       provider: providerName,
       responseBody: response,
     });
@@ -1701,7 +1701,7 @@ function buildSendResult(
   const providerMessageId = coerceString(message["id"]);
 
   if (!providerMessageId) {
-    throw new GatewayError("Meta WhatsApp Cloud API did not return a message id.", {
+    throw new ProviderError("Meta WhatsApp Cloud API did not return a message id.", {
       provider: providerName,
       responseBody: response,
     });
@@ -1731,7 +1731,7 @@ function validateResponse(
   response: Record<string, unknown>,
 ): Record<string, unknown> {
   if (!Object.keys(response).length) {
-    throw new GatewayError("Meta WhatsApp Cloud API returned a non-object response.", {
+    throw new ProviderError("Meta WhatsApp Cloud API returned a non-object response.", {
       provider: providerName,
       responseBody: response,
     });
@@ -1745,7 +1745,7 @@ function validateResponse(
       coerceString(error["message"]) ??
       "Provider request failed.";
 
-    throw new GatewayError(`Meta WhatsApp request failed: ${description}`, {
+    throw new ProviderError(`Meta WhatsApp request failed: ${description}`, {
       provider: providerName,
       errorCode: coerceString(error["code"]),
       errorDescription: description,

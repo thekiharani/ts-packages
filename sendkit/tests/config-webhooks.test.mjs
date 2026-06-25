@@ -4,20 +4,17 @@ import { createHmac } from "node:crypto";
 
 import {
   ConfigurationError,
-  MessagingClient,
-  MetaWhatsAppGateway,
-  OnfonSmsGateway,
-  SmsService,
+  MetaWhatsAppClient,
+  OnfonSmsClient,
   WebhookVerificationError,
-  WhatsAppService,
   parseOnfonDeliveryReport,
   requireValidMetaSignature,
   resolveMetaSubscriptionChallenge,
   verifyMetaSignature,
 } from "../dist/index.js";
 
-test("fromEnv helpers resolve gateway configuration", () => {
-  const sms = OnfonSmsGateway.fromEnv({
+test("fromEnv helpers resolve client configuration", () => {
+  const sms = OnfonSmsClient.fromEnv({
     env: {
       ONFON_ACCESS_KEY: "access-key",
       ONFON_API_KEY: "api-key",
@@ -28,7 +25,7 @@ test("fromEnv helpers resolve gateway configuration", () => {
     fetch: async () => jsonResponse({ ErrorCode: "000", ErrorDescription: "Success", Data: [] }),
   });
 
-  const whatsapp = MetaWhatsAppGateway.fromEnv({
+  const whatsapp = MetaWhatsAppClient.fromEnv({
     env: {
       META_WHATSAPP_ACCESS_TOKEN: "token",
       META_WHATSAPP_PHONE_NUMBER_ID: "123456789",
@@ -42,20 +39,15 @@ test("fromEnv helpers resolve gateway configuration", () => {
   assert.ok(whatsapp);
 });
 
-test("services guard missing configuration", async () => {
-  const client = new MessagingClient();
-
-  await assert.rejects(() => client.sms.send({ messages: [] }), ConfigurationError);
-  await assert.rejects(
-    () => client.whatsapp.sendText({ recipient: "254700123456", text: "hello" }),
+test("provider clients validate required configuration directly", () => {
+  assert.throws(
+    () => new OnfonSmsClient({ accessKey: "", apiKey: "api-key", clientId: "client-id" }),
     ConfigurationError,
   );
-
-  const smsService = new SmsService();
-  const whatsappService = new WhatsAppService();
-
-  assert.equal(smsService.configured, false);
-  assert.equal(whatsappService.configured, false);
+  assert.throws(
+    () => new MetaWhatsAppClient({ accessToken: "", phoneNumberId: "123456789" }),
+    ConfigurationError,
+  );
 });
 
 test("webhook helpers resolve challenge, verify signatures, and delegate Onfon parsing", () => {
@@ -82,7 +74,7 @@ test("webhook helpers resolve challenge, verify signatures, and delegate Onfon p
     WebhookVerificationError,
   );
 
-  const sms = new OnfonSmsGateway({
+  const sms = new OnfonSmsClient({
     accessKey: "access-key",
     apiKey: "api-key",
     clientId: "client-id",

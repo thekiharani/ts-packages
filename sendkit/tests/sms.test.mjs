@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 
 import {
   ConfigurationError,
-  GatewayError,
+  ProviderError,
   ONFON_SMS_BASE_URL,
-  OnfonSmsGateway,
+  OnfonSmsClient,
 } from "../dist/index.js";
 
-test("OnfonSmsGateway validates required config", () => {
-  assert.throws(() => new OnfonSmsGateway({ accessKey: "", apiKey: "a", clientId: "b" }), ConfigurationError);
+test("OnfonSmsClient validates required config", () => {
+  assert.throws(() => new OnfonSmsClient({ accessKey: "", apiKey: "a", clientId: "b" }), ConfigurationError);
 });
 
-test("OnfonSmsGateway supports send, balance, group, template, and delivery-report flows", async () => {
+test("OnfonSmsClient supports send, balance, group, template, and delivery-report flows", async () => {
   const calls = [];
-  const gateway = new OnfonSmsGateway({
+  const client = new OnfonSmsClient({
     accessKey: "access-key",
     apiKey: "api-key",
     clientId: "client-id",
@@ -76,7 +76,7 @@ test("OnfonSmsGateway supports send, balance, group, template, and delivery-repo
     },
   });
 
-  const sendResult = await gateway.send({
+  const sendResult = await client.send({
     messages: [
       { recipient: "254700123456", text: "One", reference: "r1" },
       { recipient: "254711111111", text: "Two", reference: "r2" },
@@ -91,22 +91,22 @@ test("OnfonSmsGateway supports send, balance, group, template, and delivery-repo
   assert.equal(calls[0].headers.get("AccessKey"), "access-key");
   assert.equal(calls[0].payload.SenderId, "NORIA");
 
-  const balance = await gateway.getBalance();
+  const balance = await client.getBalance();
   assert.equal(balance.entries[0].credits, 1024.5);
 
-  const groups = await gateway.listGroups();
+  const groups = await client.listGroups();
   assert.equal(groups[0].groupId, "group-1");
 
-  const createGroup = await gateway.createGroup({ name: "VIP" });
+  const createGroup = await client.createGroup({ name: "VIP" });
   assert.equal(createGroup.success, true);
 
-  const templates = await gateway.listTemplates();
+  const templates = await client.listTemplates();
   assert.equal(templates[0].templateId, "tmpl-1");
 
-  const createTemplate = await gateway.createTemplate({ name: "otp", body: "Use {{1}}" });
+  const createTemplate = await client.createTemplate({ name: "otp", body: "Use {{1}}" });
   assert.equal(createTemplate.success, true);
 
-  const report = gateway.parseDeliveryReport({
+  const report = client.parseDeliveryReport({
     messageId: "msg-1",
     mobile: "254700123456",
     status: "Delivered",
@@ -115,8 +115,8 @@ test("OnfonSmsGateway supports send, balance, group, template, and delivery-repo
   assert.equal(report?.state, "delivered");
 });
 
-test("OnfonSmsGateway raises GatewayError on provider failures", async () => {
-  const gateway = new OnfonSmsGateway({
+test("OnfonSmsClient raises ProviderError on provider failures", async () => {
+  const client = new OnfonSmsClient({
     accessKey: "access-key",
     apiKey: "api-key",
     clientId: "client-id",
@@ -130,10 +130,10 @@ test("OnfonSmsGateway raises GatewayError on provider failures", async () => {
 
   await assert.rejects(
     () =>
-      gateway.send({
+      client.send({
         messages: [{ recipient: "254700123456", text: "hello" }],
       }),
-    GatewayError,
+    ProviderError,
   );
 });
 
