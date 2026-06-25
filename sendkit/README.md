@@ -6,6 +6,8 @@ Node `>=20` is required.
 
 Designed for Node.js services, workers, and serverless messaging flows.
 
+Import only the WhatsApp client or the SMS gateway client you need.
+
 ## Install
 
 ```bash
