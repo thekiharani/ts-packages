@@ -6,7 +6,7 @@ Published packages:
 
 - `@norialabs/sendkit`: modular WhatsApp and bulk SMS SDK for Meta, Onfon, and Africa's Talking
 - `@norialabs/logger`: structured JSON logging for Node.js services
-- `@norialabs/sendstack`: JavaScript SDK for Sendstack email, SMS, WhatsApp, and merchant messaging APIs
+- `@norialabs/sendstack`: JavaScript SDK for the SendStack email SaaS API
 - `@norialabs/payments`: payments SDK for M-PESA Daraja, SasaPay, and Paystack
 - `@norialabs/storage`: S3 and R2 storage client for Node.js services
 

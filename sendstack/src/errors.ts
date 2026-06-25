@@ -1,21 +1,21 @@
 import type { ErrorEnvelope } from "./types";
 
-export interface MailerErrorOptions {
+export interface SendstackErrorOptions {
   statusCode: number;
   code?: string;
   details?: unknown;
   responseBody?: unknown;
 }
 
-export class MailerError extends Error {
+export class SendstackError extends Error {
   readonly statusCode: number;
   readonly code?: string;
   readonly details?: unknown;
   readonly responseBody?: unknown;
 
-  constructor(message: string, options: MailerErrorOptions) {
+  constructor(message: string, options: SendstackErrorOptions) {
     super(message);
-    this.name = "MailerError";
+    this.name = "SendstackError";
     this.statusCode = options.statusCode;
     this.code = options.code;
     this.details = options.details;

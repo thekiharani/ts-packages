@@ -1,7 +1,7 @@
 {
   "name": "@norialabs/sendstack",
   "version": "0.1.3",
-  "description": "Official JavaScript SDK for Sendstack messaging APIs.",
+  "description": "Official JavaScript SDK for the SendStack email SaaS API.",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -47,10 +47,9 @@
   },
   "keywords": [
     "sendstack",
-    "messaging",
     "email",
-    "sms",
-    "whatsapp",
+    "transactional-email",
+    "webhooks",
     "noria",
     "sdk"
   ],

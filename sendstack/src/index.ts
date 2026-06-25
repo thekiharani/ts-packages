@@ -1,292 +1,219 @@
-import { MailerError, isErrorEnvelope } from "./errors";
+import { SendstackError, isErrorEnvelope } from "./errors";
 import type {
-  ApiKey,
-  CreateApiKeyRequest,
   CreateDomainRequest,
-  CreateWebhookRequest,
-  CreatedApiKey,
-  DeleteDomainResult,
-  DeleteWebhookResult,
+  CreateSuppressionRequest,
+  CreateSuppressionResult,
+  CreateTemplateRequest,
+  CreateWebhookEndpointRequest,
+  CursorPage,
   Domain,
-  Email,
-  HealthStatus,
+  EmailEvent,
+  EmailMessage,
+  EmailTemplate,
   ListEmailsOptions,
-  ListMessagesOptions,
-  ListResponse,
-  MailerAuthStrategy,
-  MailerBody,
-  MailerClientOptions,
-  MailerMiddleware,
-  MailerQueryParams,
-  MailerQueryValue,
-  MailerRawRequestOptions,
-  MailerRequestContext,
-  MailerRequestOptions,
-  MailerResponseContext,
-  MailerResponseParser,
-  MailerResponseTransformer,
-  MailerRetryContext,
-  MailerRetryOptions,
-  Message,
-  MessageBatch,
-  MessageQuote,
-  RevokeApiKeyResult,
-  SendEmailOptions,
+  RetryWebhookEventResult,
+  SendEmailBatchRequest,
+  SendEmailBatchResult,
   SendEmailRequest,
   SendEmailResult,
-  SendSmsRequest,
-  SendSmsResult,
-  SendWhatsAppRequest,
-  SendWhatsAppResult,
+  SendstackAuthStrategy,
+  SendstackBody,
+  SendstackClientOptions,
+  SendstackMiddleware,
+  SendstackMutationOptions,
+  SendstackQueryParams,
+  SendstackQueryValue,
+  SendstackRawRequestOptions,
+  SendstackRequestContext,
+  SendstackRequestOptions,
+  SendstackResponseContext,
+  SendstackResponseParser,
+  SendstackResponseTransformer,
+  SendstackRetryContext,
+  SendstackRetryOptions,
   SuccessEnvelope,
-  VerifyDomainResult,
+  Suppression,
+  UpdateTemplateRequest,
+  UpdateWebhookEndpointRequest,
+  UploadAttachmentRequest,
+  UploadedAttachment,
   WebhookEndpoint,
 } from "./types";
+import { DEFAULT_BASE_URL } from "./types";
 
-export { MailerError } from "./errors";
+export { SendstackError } from "./errors";
+export { DEFAULT_BASE_URL } from "./types";
 export type {
-  ApiKey,
-  ApiKeyEnvironment,
-  CreateApiKeyRequest,
   CreateDomainRequest,
-  CreateWebhookRequest,
-  CreatedApiKey,
-  DeleteDomainResult,
-  DeleteWebhookResult,
+  CreateSuppressionRequest,
+  CreateSuppressionResult,
+  CreateTemplateRequest,
+  CreateWebhookEndpointRequest,
+  CursorPage,
   Domain,
-  DomainCapabilities,
-  DomainRecord,
-  Email,
+  DomainCapability,
+  DomainRegion,
+  DomainTlsPolicy,
   EmailAttachmentInput,
+  EmailEvent,
+  EmailMessage,
+  EmailStatus,
+  EmailTemplate,
   ErrorEnvelope,
-  HealthStatus,
   KnownWebhookEvent,
   ListEmailsOptions,
-  ListManagementOptionsInput,
-  ListMessagesOptions,
-  ListResponse,
-  MailerAuthStrategy,
-  MailerBearerAuthStrategy,
-  MailerBody,
-  MailerClientOptions,
-  MailerHeadersAuthStrategy,
-  MailerMiddleware,
-  MailerQueryParams,
-  MailerQueryValue,
-  MailerRawRequestOptions,
-  MailerRequestContext,
-  MailerRequestOptions,
-  MailerResponseContext,
-  MailerResponseParser,
-  MailerResponseTransformer,
-  MailerRetryContext,
-  MailerRetryOptions,
-  Message,
-  MessageAttachment,
-  MessageBatch,
-  MessageQuote,
-  PaginationResponse,
   Recipient,
-  RevokeApiKeyResult,
-  SendEmailOptions,
+  RetryWebhookEventResult,
+  SendEmailBatchRequest,
+  SendEmailBatchResult,
   SendEmailRequest,
   SendEmailResult,
-  SendSmsRequest,
-  SendSmsResult,
-  SendWhatsAppRequest,
-  SendWhatsAppResult,
+  SendstackAuthStrategy,
+  SendstackBearerAuthStrategy,
+  SendstackBody,
+  SendstackClientOptions,
+  SendstackHeadersAuthStrategy,
+  SendstackMiddleware,
+  SendstackMutationOptions,
+  SendstackQueryParams,
+  SendstackQueryValue,
+  SendstackRawRequestOptions,
+  SendstackRequestContext,
+  SendstackRequestOptions,
+  SendstackResponseContext,
+  SendstackResponseParser,
+  SendstackResponseTransformer,
+  SendstackRetryContext,
+  SendstackRetryOptions,
   SuccessEnvelope,
-  VerifyDomainResult,
+  Suppression,
+  SuppressionReason,
+  TemplateReference,
+  UpdateTemplateRequest,
+  UpdateWebhookEndpointRequest,
+  UploadAttachmentRequest,
+  UploadedAttachment,
   WebhookEndpoint,
-  WebhookEvent,
+  WebhookEventType,
 } from "./types";
 
 interface NormalizedRetryPolicy {
   maxAttempts: number;
-  shouldRetry?: (context: MailerRetryContext) => Promise<boolean>;
-  delayMs?: (context: MailerRetryContext) => Promise<number>;
+  shouldRetry?: (context: SendstackRetryContext) => Promise<boolean>;
+  delayMs?: (context: SendstackRetryContext) => Promise<number>;
 }
 
-export class Mailer {
-  readonly apiKey: string;
+export class Sendstack {
+  readonly token: string;
   readonly baseUrl: string;
   readonly timeoutMs: number;
-  readonly emails: {
-    quote: <TRequest extends SendEmailRequest>(
+  readonly attachments: {
+    upload: <TRequest extends UploadAttachmentRequest>(
       request: TRequest,
-      options?: SendEmailOptions,
-    ) => Promise<MessageQuote>;
+      options?: SendstackMutationOptions,
+    ) => Promise<UploadedAttachment>;
+  };
+  readonly emails: {
     send: <TRequest extends SendEmailRequest>(
       request: TRequest,
-      options?: SendEmailOptions,
+      options?: SendstackMutationOptions,
     ) => Promise<SendEmailResult>;
-    sendBatch: <TRequest extends SendEmailRequest>(
-      requests: TRequest[],
-      options?: MailerRequestOptions,
-    ) => Promise<unknown>;
-    get: (id: string, options?: MailerRequestOptions) => Promise<Email>;
-    list: <TOptions extends ListEmailsOptions & MailerRequestOptions>(
+    sendBatch: <TRequest extends SendEmailBatchRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SendEmailBatchResult>;
+    list: <TOptions extends ListEmailsOptions & SendstackRequestOptions>(
       options?: TOptions,
-    ) => Promise<ListResponse<Message>>;
-  };
-  readonly sms: {
-    quote: <TRequest extends SendSmsRequest>(
-      request: TRequest,
-      options?: SendEmailOptions,
-    ) => Promise<MessageQuote>;
-    send: <TRequest extends SendSmsRequest>(
-      request: TRequest,
-      options?: SendEmailOptions,
-    ) => Promise<SendSmsResult>;
-    get: (id: string, options?: MailerRequestOptions) => Promise<Message>;
-    list: <TOptions extends ListEmailsOptions & MailerRequestOptions>(
-      options?: TOptions,
-    ) => Promise<ListResponse<Message>>;
-  };
-  readonly whatsapp: {
-    quote: <TRequest extends SendWhatsAppRequest>(
-      request: TRequest,
-      options?: SendEmailOptions,
-    ) => Promise<MessageQuote>;
-    send: <TRequest extends SendWhatsAppRequest>(
-      request: TRequest,
-      options?: SendEmailOptions,
-    ) => Promise<SendWhatsAppResult>;
-    get: (id: string, options?: MailerRequestOptions) => Promise<Message>;
-    list: <TOptions extends ListEmailsOptions & MailerRequestOptions>(
-      options?: TOptions,
-    ) => Promise<ListResponse<Message>>;
-  };
-  readonly merchant: {
-    messages: {
-      get: (merchantId: string, messageId: string, options?: MailerRequestOptions) => Promise<Message>;
-      list: <TOptions extends ListMessagesOptions & MailerRequestOptions>(
-        merchantId: string,
-        options?: TOptions,
-      ) => Promise<ListResponse<Message>>;
-    };
-    emails: {
-      quote: <TRequest extends SendEmailRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<MessageQuote>;
-      quoteGroup: <TRequest extends SendEmailRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<MessageQuote>;
-      send: <TRequest extends SendEmailRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<Message>;
-      sendGroup: <TRequest extends SendEmailRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<MessageBatch>;
-    };
-    sms: {
-      quote: <TRequest extends SendSmsRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<MessageQuote>;
-      send: <TRequest extends SendSmsRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<Message>;
-    };
-    whatsapp: {
-      quote: <TRequest extends SendWhatsAppRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<MessageQuote>;
-      send: <TRequest extends SendWhatsAppRequest>(
-        merchantId: string,
-        request: TRequest,
-        options?: SendEmailOptions,
-      ) => Promise<Message>;
-    };
+    ) => Promise<CursorPage<EmailMessage>>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<EmailMessage>;
+    events: (id: string, options?: SendstackRequestOptions) => Promise<CursorPage<EmailEvent>>;
+    cancel: (id: string, options?: SendstackMutationOptions) => Promise<EmailMessage>;
+    requeue: (id: string, options?: SendstackMutationOptions) => Promise<EmailMessage>;
   };
   readonly domains: {
     create: <TRequest extends CreateDomainRequest>(
       request: TRequest,
-      options?: MailerRequestOptions,
+      options?: SendstackMutationOptions,
     ) => Promise<Domain>;
-    list: (options?: MailerRequestOptions) => Promise<ListResponse<Domain>>;
-    get: (id: string, options?: MailerRequestOptions) => Promise<Domain>;
-    verify: (id: string, options?: MailerRequestOptions) => Promise<VerifyDomainResult>;
-    remove: (id: string, options?: MailerRequestOptions) => Promise<DeleteDomainResult>;
+    list: (options?: SendstackRequestOptions) => Promise<CursorPage<Domain>>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<Domain>;
+    verify: (id: string, options?: SendstackMutationOptions) => Promise<Domain>;
   };
-  readonly apiKeys: {
-    create: <TRequest extends CreateApiKeyRequest>(
-      request?: TRequest,
-      options?: MailerRequestOptions,
-    ) => Promise<CreatedApiKey>;
-    list: (options?: MailerRequestOptions) => Promise<ApiKey[]>;
-    get: (id: string, options?: MailerRequestOptions) => Promise<ApiKey>;
-    remove: (id: string, options?: MailerRequestOptions) => Promise<RevokeApiKeyResult>;
+  readonly templates: {
+    create: <TRequest extends CreateTemplateRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<EmailTemplate>;
+    list: (options?: SendstackRequestOptions) => Promise<CursorPage<EmailTemplate>>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<EmailTemplate>;
+    update: <TRequest extends UpdateTemplateRequest>(
+      id: string,
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<EmailTemplate>;
+    remove: (id: string, options?: SendstackMutationOptions) => Promise<void>;
   };
   readonly webhooks: {
-    create: <TRequest extends CreateWebhookRequest>(
+    create: <TRequest extends CreateWebhookEndpointRequest>(
       request: TRequest,
-      options?: MailerRequestOptions,
+      options?: SendstackMutationOptions,
     ) => Promise<WebhookEndpoint>;
-    list: (options?: MailerRequestOptions) => Promise<WebhookEndpoint[]>;
-    remove: (id: string, options?: MailerRequestOptions) => Promise<DeleteWebhookResult>;
+    list: (options?: SendstackRequestOptions) => Promise<CursorPage<WebhookEndpoint>>;
+    update: <TRequest extends UpdateWebhookEndpointRequest>(
+      id: string,
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<WebhookEndpoint>;
+    remove: (id: string, options?: SendstackMutationOptions) => Promise<void>;
   };
-  readonly health: {
-    live: (options?: MailerRequestOptions) => Promise<HealthStatus>;
-    check: (options?: MailerRequestOptions) => Promise<HealthStatus>;
-    ready: (options?: MailerRequestOptions) => Promise<HealthStatus>;
+  readonly webhookEvents: {
+    retry: (id: string, options?: SendstackMutationOptions) => Promise<RetryWebhookEventResult>;
+  };
+  readonly suppressions: {
+    add: <TRequest extends CreateSuppressionRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<CreateSuppressionResult>;
+    list: (options?: SendstackRequestOptions) => Promise<CursorPage<Suppression>>;
+    remove: (recipient: string, options?: SendstackMutationOptions) => Promise<void>;
   };
 
   readonly #fetch: typeof fetch;
   readonly #headers: HeadersInit | undefined;
-  readonly #query: MailerQueryParams | undefined;
-  readonly #auth: MailerAuthStrategy | false;
-  readonly #middleware: MailerMiddleware[];
-  readonly #retry: MailerRetryOptions | number | false | undefined;
-  readonly #parseResponse: MailerResponseParser;
-  readonly #transformResponse: MailerResponseTransformer;
+  readonly #query: SendstackQueryParams | undefined;
+  readonly #auth: SendstackAuthStrategy | false;
+  readonly #middleware: SendstackMiddleware[];
+  readonly #retry: SendstackRetryOptions | number | false | undefined;
+  readonly #parseResponse: SendstackResponseParser;
+  readonly #transformResponse: SendstackResponseTransformer;
 
-  constructor(options: MailerClientOptions);
-  constructor(apiKey: string, options: MailerClientOptions);
+  constructor(options?: SendstackClientOptions);
+  constructor(token: string, options?: SendstackClientOptions);
   constructor(
-    apiKeyOrOptions: string | MailerClientOptions,
-    maybeOptions?: MailerClientOptions,
+    tokenOrOptions: string | SendstackClientOptions = {},
+    maybeOptions?: SendstackClientOptions,
   ) {
-    const options = typeof apiKeyOrOptions === "string" ? maybeOptions : apiKeyOrOptions;
-    const apiKey = typeof apiKeyOrOptions === "string" ? apiKeyOrOptions : "";
-
-    if (!options?.baseUrl || options.baseUrl.trim() === "") {
-      throw new TypeError("Mailer baseUrl is required.");
-    }
+    const options = typeof tokenOrOptions === "string" ? maybeOptions ?? {} : tokenOrOptions;
+    const token = typeof tokenOrOptions === "string" ? tokenOrOptions : options.token ?? "";
 
     if (typeof fetch !== "function" && !options.fetch) {
       throw new TypeError("A fetch implementation is required in this runtime.");
     }
 
-    const normalizedApiKey = apiKey.trim();
+    const normalizedToken = token.trim();
 
-    this.apiKey = normalizedApiKey;
-    this.baseUrl = normalizeBaseUrl(options.baseUrl);
+    this.token = normalizedToken;
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.#fetch = options.fetch ?? fetch;
     this.#headers = options.headers;
     this.#query = options.query;
     this.#auth = options.auth ?? (
-      normalizedApiKey === ""
+      normalizedToken === ""
         ? false
         : {
-            type: "headers",
-            headers: {
-              "x-api-key": normalizedApiKey,
-            },
+            type: "bearer",
+            token: normalizedToken,
           }
     );
     this.#middleware = options.middleware ?? [];
@@ -294,200 +221,145 @@ export class Mailer {
     this.#parseResponse = options.parseResponse ?? parseResponseBody;
     this.#transformResponse = options.transformResponse ?? defaultTransformResponse;
 
-    this.emails = {
-      quote: (request, requestOptions) =>
-        this.request("POST", "/emails/quote", {
+    this.attachments = {
+      upload: (request, requestOptions) =>
+        this.request("POST", "/attachments", {
           ...requestOptions,
-          body: normalizeSendEmailRequest(request),
+          body: normalizeUploadAttachmentRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
+    };
+
+    this.emails = {
       send: (request, requestOptions) =>
         this.request("POST", "/emails", {
           ...requestOptions,
           body: normalizeSendEmailRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
-      sendBatch: (requests, requestOptions) =>
+      sendBatch: (request, requestOptions) =>
         this.request("POST", "/emails/batch", {
           ...requestOptions,
-          body: requests.map((request) => normalizeSendEmailRequest(request)),
-          transformResponse: requestOptions?.transformResponse ?? extractDataArrayResponse,
+          body: normalizeSendEmailBatchRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
         }),
-      get: (id, requestOptions) =>
-        this.request("GET", `/emails/${encodeURIComponent(id)}`, requestOptions),
       list: (requestOptions) =>
         this.request("GET", "/emails", {
           ...requestOptions,
-          query: mergeListQuery(requestOptions),
-        }),
-    };
-
-    this.sms = {
-      quote: (request, requestOptions) =>
-        this.request("POST", "/sms/quote", {
-          ...requestOptions,
-          body: normalizeSmsRequest(request),
-          idempotencyKey: requestOptions?.idempotencyKey,
-        }),
-      send: (request, requestOptions) =>
-        this.request("POST", "/sms", {
-          ...requestOptions,
-          body: normalizeSmsRequest(request),
-          idempotencyKey: requestOptions?.idempotencyKey,
+          query: mergeEmailListQuery(requestOptions),
         }),
       get: (id, requestOptions) =>
-        this.request("GET", `/sms/${encodeURIComponent(id)}`, requestOptions),
-      list: (requestOptions) =>
-        this.request("GET", "/sms", {
+        this.request("GET", `/emails/${encodeURIComponent(id)}`, requestOptions),
+      events: (id, requestOptions) =>
+        this.request("GET", `/emails/${encodeURIComponent(id)}/events`, requestOptions),
+      cancel: (id, requestOptions) =>
+        this.request("POST", `/emails/${encodeURIComponent(id)}/cancel`, {
           ...requestOptions,
-          query: mergeListQuery(requestOptions),
-        }),
-    };
-
-    this.whatsapp = {
-      quote: (request, requestOptions) =>
-        this.request("POST", "/whatsapp/messages/quote", {
-          ...requestOptions,
-          body: normalizeWhatsAppRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
-      send: (request, requestOptions) =>
-        this.request("POST", "/whatsapp/messages", {
+      requeue: (id, requestOptions) =>
+        this.request("POST", `/emails/${encodeURIComponent(id)}/requeue`, {
           ...requestOptions,
-          body: normalizeWhatsAppRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
-      get: (id, requestOptions) =>
-        this.request("GET", `/whatsapp/messages/${encodeURIComponent(id)}`, requestOptions),
-      list: (requestOptions) =>
-        this.request("GET", "/whatsapp/messages", {
-          ...requestOptions,
-          query: mergeListQuery(requestOptions),
-        }),
-    };
-
-    this.merchant = {
-      messages: {
-        get: (merchantId, messageId, requestOptions) =>
-          this.request(
-            "GET",
-            merchantMessagesPath(merchantId, `/${encodeURIComponent(messageId)}`),
-            requestOptions,
-          ),
-        list: (merchantId, requestOptions) =>
-          this.request("GET", merchantMessagesPath(merchantId), {
-            ...requestOptions,
-            query: mergeListQuery(requestOptions, {
-              channel: requestOptions?.channel,
-            }),
-          }),
-      },
-      emails: {
-        quote: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/email/quote"), {
-            ...requestOptions,
-            body: normalizeSendEmailRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-        quoteGroup: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/email/group/quote"), {
-            ...requestOptions,
-            body: normalizeSendEmailRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-        send: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/email"), {
-            ...requestOptions,
-            body: normalizeSendEmailRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-        sendGroup: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/email/group"), {
-            ...requestOptions,
-            body: normalizeSendEmailRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-      },
-      sms: {
-        quote: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/sms/quote"), {
-            ...requestOptions,
-            body: normalizeSmsRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-        send: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/sms"), {
-            ...requestOptions,
-            body: normalizeSmsRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-      },
-      whatsapp: {
-        quote: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/whatsapp/quote"), {
-            ...requestOptions,
-            body: normalizeWhatsAppRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-        send: (merchantId, request, requestOptions) =>
-          this.request("POST", merchantMessagesPath(merchantId, "/whatsapp"), {
-            ...requestOptions,
-            body: normalizeWhatsAppRequest(request),
-            idempotencyKey: requestOptions?.idempotencyKey,
-          }),
-      },
     };
 
     this.domains = {
       create: (request, requestOptions) =>
-        this.request("POST", "/domains", { ...requestOptions, body: request }),
+        this.request("POST", "/domains", {
+          ...requestOptions,
+          body: normalizeDomainRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
       list: (requestOptions) =>
         this.request("GET", "/domains", requestOptions),
       get: (id, requestOptions) =>
         this.request("GET", `/domains/${encodeURIComponent(id)}`, requestOptions),
       verify: (id, requestOptions) =>
-        this.request("POST", `/domains/${encodeURIComponent(id)}/verify`, requestOptions),
-      remove: (id, requestOptions) =>
-        this.request("DELETE", `/domains/${encodeURIComponent(id)}`, requestOptions),
+        this.request("POST", `/domains/${encodeURIComponent(id)}/verify`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
     };
 
-    this.apiKeys = {
+    this.templates = {
       create: (request, requestOptions) =>
-        this.request("POST", "/api-keys", {
+        this.request("POST", "/templates", {
           ...requestOptions,
-          body: serializeCreateApiKeyRequest(request),
+          body: request,
+          idempotencyKey: requestOptions?.idempotencyKey,
         }),
       list: (requestOptions) =>
-        this.request("GET", "/api-keys", requestOptions),
+        this.request("GET", "/templates", requestOptions),
       get: (id, requestOptions) =>
-        this.request("GET", `/api-keys/${encodeURIComponent(id)}`, requestOptions),
-      remove: (id, requestOptions) =>
-        this.request("DELETE", `/api-keys/${encodeURIComponent(id)}`, requestOptions),
+        this.request("GET", `/templates/${encodeURIComponent(id)}`, requestOptions),
+      update: (id, request, requestOptions) =>
+        this.request("PATCH", `/templates/${encodeURIComponent(id)}`, {
+          ...requestOptions,
+          body: request,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      remove: async (id, requestOptions) => {
+        await this.request("DELETE", `/templates/${encodeURIComponent(id)}`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        });
+      },
     };
 
     this.webhooks = {
       create: (request, requestOptions) =>
-        this.request("POST", "/webhooks", { ...requestOptions, body: request }),
+        this.request("POST", "/webhook-endpoints", {
+          ...requestOptions,
+          body: normalizeWebhookEndpointRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
       list: (requestOptions) =>
-        this.request("GET", "/webhooks", requestOptions),
-      remove: (id, requestOptions) =>
-        this.request("DELETE", `/webhooks/${encodeURIComponent(id)}`, requestOptions),
+        this.request("GET", "/webhook-endpoints", requestOptions),
+      update: (id, request, requestOptions) =>
+        this.request("PATCH", `/webhook-endpoints/${encodeURIComponent(id)}`, {
+          ...requestOptions,
+          body: normalizeWebhookEndpointRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      remove: async (id, requestOptions) => {
+        await this.request("DELETE", `/webhook-endpoints/${encodeURIComponent(id)}`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        });
+      },
     };
 
-    this.health = {
-      live: (requestOptions) =>
-        this.request("GET", rootUrlPath(this.baseUrl, "/livez"), withDefaultUnauthenticated(requestOptions)),
-      check: (requestOptions) =>
-        this.request("GET", rootUrlPath(this.baseUrl, "/healthz"), withDefaultUnauthenticated(requestOptions)),
-      ready: (requestOptions) =>
-        this.request("GET", rootUrlPath(this.baseUrl, "/readyz"), withDefaultUnauthenticated(requestOptions)),
+    this.webhookEvents = {
+      retry: (id, requestOptions) =>
+        this.request("POST", `/events/${encodeURIComponent(id)}/retry`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+    };
+
+    this.suppressions = {
+      add: (request, requestOptions) =>
+        this.request("POST", "/suppressions", {
+          ...requestOptions,
+          body: request,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      list: (requestOptions) =>
+        this.request("GET", "/suppressions", requestOptions),
+      remove: async (recipient, requestOptions) => {
+        await this.request("DELETE", `/suppressions/${encodeURIComponent(recipient)}`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        });
+      },
     };
   }
 
   async request<T>(
     method: string,
     path: string,
-    options: MailerRawRequestOptions = {},
+    options: SendstackRawRequestOptions = {},
   ): Promise<T> {
     const fetchImpl = options.fetch ?? this.#fetch;
     const timeoutMs = options.timeoutMs ?? this.timeoutMs;
@@ -581,7 +453,7 @@ export class Mailer {
       }
     }
 
-    throw new MailerError("Mailer request exhausted all retry attempts.", {
+    throw new SendstackError("Sendstack request exhausted all retry attempts.", {
       statusCode: 0,
     });
   }
@@ -593,18 +465,17 @@ export class Mailer {
     url: URL;
     timeoutMs: number;
     signal: AbortSignal;
-    options: MailerRawRequestOptions;
-  }): Promise<MailerRequestContext> {
+    options: SendstackRawRequestOptions;
+  }): Promise<SendstackRequestContext> {
     const headers = mergeHeaders(this.#headers, input.options.headers);
     const authenticated = input.options.authenticated ?? true;
     const auth = input.options.auth === undefined ? this.#auth : input.options.auth;
 
     if (!authenticated) {
       headers.delete("authorization");
-      headers.delete("x-api-key");
     } else {
       if (!auth && !hasExplicitAuthHeaders(headers)) {
-        throw new TypeError("Mailer auth is required for authenticated requests.");
+        throw new TypeError("Sendstack auth is required for authenticated requests.");
       }
 
       if (auth) {
@@ -649,8 +520,8 @@ export class Mailer {
 }
 
 async function applyResponseTransform<T>(
-  context: MailerResponseContext,
-  transformResponse: MailerResponseTransformer,
+  context: SendstackResponseContext,
+  transformResponse: SendstackResponseTransformer,
   unwrapData?: boolean,
 ): Promise<T> {
   if (transformResponse === defaultTransformResponse) {
@@ -661,11 +532,11 @@ async function applyResponseTransform<T>(
 }
 
 function defaultTransformResponse(
-  context: MailerResponseContext,
+  context: SendstackResponseContext,
   unwrapData = true,
 ): unknown {
   if (!context.response.ok) {
-    throw toMailerError(context.response.status, context.payload);
+    throw toSendstackError(context.response.status, context.payload);
   }
 
   if (unwrapData && isSuccessEnvelope(context.payload)) {
@@ -675,63 +546,35 @@ function defaultTransformResponse(
   return context.payload;
 }
 
-function extractDataArrayResponse(context: MailerResponseContext): unknown {
-  const payload = defaultTransformResponse(context, false);
-
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  if (payload && typeof payload === "object") {
-    const record = payload as Record<string, unknown>;
-    if (Array.isArray(record["data"])) {
-      return record["data"];
-    }
-  }
-
+function normalizeUploadAttachmentRequest(request: UploadAttachmentRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "contentBase64", "content_base64");
+  renameAlias(payload, "contentType", "content_type");
   return payload;
 }
 
-function serializeCreateApiKeyRequest(request?: CreateApiKeyRequest): Record<string, unknown> {
-  if (!request) {
-    return {};
+function normalizeSendEmailBatchRequest(request: SendEmailBatchRequest): Record<string, unknown> | Array<Record<string, unknown>> {
+  if (Array.isArray(request)) {
+    return request.map((email) => normalizeSendEmailRequest(email));
   }
 
-  const payload = { ...request } as Record<string, unknown>;
-  renameAlias(payload, "expires_at", "expiresAt");
-
-  if (payload["expiresAt"] instanceof Date) {
-    payload["expiresAt"] = payload["expiresAt"].toISOString();
-  }
-
-  return payload;
+  return {
+    emails: request.emails.map((email) => normalizeSendEmailRequest(email)),
+  };
 }
 
 function normalizeSendEmailRequest(request: SendEmailRequest): Record<string, unknown> {
   const payload = { ...request } as Record<string, unknown>;
-  renameAlias(payload, "reply_to", "replyTo");
-  renameAlias(payload, "scheduled_at", "scheduledAt");
-  renameAlias(payload, "configuration_set_name", "configurationSetName");
-  renameAlias(payload, "tenant_name", "tenantName");
-  renameAlias(payload, "endpoint_id", "endpointId");
-  renameAlias(payload, "feedback_forwarding_email_address", "feedbackForwardingEmailAddress");
-  renameAlias(
-    payload,
-    "feedback_forwarding_email_address_identity_arn",
-    "feedbackForwardingEmailAddressIdentityArn",
-  );
-  renameAlias(payload, "from_email_address_identity_arn", "fromEmailAddressIdentityArn");
-  renameAlias(payload, "list_management_options", "listManagementOptions");
-  renameAlias(payload, "contactId", "contact_id");
-  renameAlias(payload, "providerConnectionId", "provider_connection_id");
+  renameAlias(payload, "replyTo", "reply_to");
+  renameAlias(payload, "trackOpens", "track_opens");
+  renameAlias(payload, "trackClicks", "track_clicks");
+  renameAlias(payload, "providerId", "provider_id");
+  renameAlias(payload, "templateId", "template_id");
+  renameAlias(payload, "templateData", "template_data");
+  renameAlias(payload, "scheduledAt", "scheduled_at");
 
-  if (payload["scheduledAt"] instanceof Date) {
-    payload["scheduledAt"] = payload["scheduledAt"].toISOString();
-  }
-
-  const listManagementOptions = payload["listManagementOptions"];
-  if (isRecord(listManagementOptions)) {
-    payload["listManagementOptions"] = normalizeListManagementOptions(listManagementOptions);
+  if (payload["scheduled_at"] instanceof Date) {
+    payload["scheduled_at"] = payload["scheduled_at"].toISOString();
   }
 
   const attachments = payload["attachments"];
@@ -743,39 +586,27 @@ function normalizeSendEmailRequest(request: SendEmailRequest): Record<string, un
   return payload;
 }
 
-function normalizeMessageRequestAliases(request: Record<string, unknown>): Record<string, unknown> {
-  const payload = { ...request } as Record<string, unknown>;
-  renameAlias(payload, "contactId", "contact_id");
-  renameAlias(payload, "templateId", "template_id");
-  renameAlias(payload, "providerConnectionId", "provider_connection_id");
-  renameAlias(payload, "idempotencyKey", "idempotency_key");
-  return payload;
-}
-
-function normalizeSmsRequest(request: SendSmsRequest): Record<string, unknown> {
-  return normalizeMessageRequestAliases(request);
-}
-
-function normalizeWhatsAppRequest(request: SendWhatsAppRequest): Record<string, unknown> {
-  const payload = normalizeMessageRequestAliases(request);
-  renameAlias(payload, "templateVariables", "variables");
-  renameAlias(payload, "template_variables", "variables");
-  return payload;
-}
-
-function normalizeListManagementOptions(options: Record<string, unknown>): Record<string, unknown> {
-  const payload = { ...options };
-  renameAlias(payload, "contact_list_name", "contactListName");
-  renameAlias(payload, "topic_name", "topicName");
-  return payload;
-}
-
 function normalizeEmailAttachment(attachment: Record<string, unknown>): Record<string, unknown> {
   const payload = { ...attachment };
-  renameAlias(payload, "content_type", "contentType");
-  renameAlias(payload, "content_id", "contentId");
-  renameAlias(payload, "contentDisposition", "disposition");
-  renameAlias(payload, "content_disposition", "disposition");
+  renameAlias(payload, "contentBase64", "content_base64");
+  renameAlias(payload, "attachmentId", "attachment_id");
+  renameAlias(payload, "contentType", "content_type");
+  renameAlias(payload, "contentId", "content_id");
+  return payload;
+}
+
+function normalizeDomainRequest(request: CreateDomainRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "providerId", "provider_id");
+  renameAlias(payload, "customReturnPath", "custom_return_path");
+  return payload;
+}
+
+function normalizeWebhookEndpointRequest(
+  request: CreateWebhookEndpointRequest | UpdateWebhookEndpointRequest,
+): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "eventTypes", "event_types");
   return payload;
 }
 
@@ -795,9 +626,9 @@ function isSuccessEnvelope<T>(value: unknown): value is SuccessEnvelope<T> {
   return record["ok"] === true && "data" in record;
 }
 
-function toMailerError(statusCode: number, payload: unknown): MailerError {
+function toSendstackError(statusCode: number, payload: unknown): SendstackError {
   if (isErrorEnvelope(payload)) {
-    return new MailerError(payload.error.message, {
+    return new SendstackError(payload.error.message, {
       statusCode,
       code: payload.error.code,
       details: payload.error.details,
@@ -808,69 +639,58 @@ function toMailerError(statusCode: number, payload: unknown): MailerError {
   if (payload && typeof payload === "object") {
     const record = payload as Record<string, unknown>;
     if (typeof record["detail"] === "string" && record["detail"].trim() !== "") {
-      return new MailerError(record["detail"], {
+      return new SendstackError(record["detail"], {
         statusCode,
         details: record["errors"],
+        responseBody: payload,
+      });
+    }
+
+    if (typeof record["message"] === "string" && record["message"].trim() !== "") {
+      return new SendstackError(record["message"], {
+        statusCode,
+        code: typeof record["code"] === "string" ? record["code"] : undefined,
+        details: record["details"],
         responseBody: payload,
       });
     }
   }
 
   if (payload instanceof Error) {
-    return new MailerError(payload.message, {
+    return new SendstackError(payload.message, {
       statusCode,
       responseBody: payload,
     });
   }
 
   if (typeof payload === "string" && payload.trim() !== "") {
-    return new MailerError(payload, {
+    return new SendstackError(payload, {
       statusCode,
       responseBody: payload,
     });
   }
 
-  return new MailerError(`Mailer request failed with status ${statusCode}.`, {
+  return new SendstackError(`Sendstack request failed with status ${statusCode}.`, {
     statusCode,
     responseBody: payload,
   });
 }
 
-function withDefaultUnauthenticated(options?: MailerRequestOptions): MailerRequestOptions {
-  return {
-    ...options,
-    authenticated: options?.authenticated ?? false,
-  };
-}
-
-function mergeListQuery(
-  options?: (ListEmailsOptions & MailerRequestOptions) | (ListMessagesOptions & MailerRequestOptions),
-  extra?: MailerQueryParams,
-): MailerQueryParams | undefined {
+function mergeEmailListQuery(
+  options?: ListEmailsOptions & SendstackRequestOptions,
+): SendstackQueryParams | undefined {
   return mergeQueryParams(
     {
       limit: options?.limit,
       cursor: options?.cursor,
-      per_page: options?.perPage ?? options?.per_page,
       status: options?.status,
     },
-    extra,
     options?.query,
   );
 }
 
-function merchantMessagesPath(merchantId: string, suffix = ""): string {
-  const path = `/merchants/${encodeURIComponent(merchantId)}/messages`;
-  return suffix === "" ? path : `${path}${suffix}`;
-}
-
-function rootUrlPath(baseUrl: string, path: string): string {
-  const url = new URL(baseUrl);
-  return `${url.protocol}//${url.host}${path}`;
-}
-
 function hasExplicitAuthHeaders(headers: Headers): boolean {
-  return headers.has("authorization") || headers.has("x-api-key");
+  return headers.has("authorization");
 }
 
 function createRequestSignal(
@@ -879,14 +699,14 @@ function createRequestSignal(
 ): { signal: AbortSignal; cleanup: () => void } {
   if (timeoutMs <= 0) {
     return {
-      signal: upstreamSignal ?? AbortSignal.abort("Mailer request timed out."),
+      signal: upstreamSignal ?? AbortSignal.abort("Sendstack request timed out."),
       cleanup: () => {},
     };
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => {
-    controller.abort(new Error(`Mailer request timed out after ${timeoutMs}ms.`));
+    controller.abort(new Error(`Sendstack request timed out after ${timeoutMs}ms.`));
   }, timeoutMs);
   let detachUpstreamAbort: (() => void) | undefined;
   let cleaned = false;
@@ -929,10 +749,10 @@ function createRequestSignal(
 }
 
 async function transport(
-  context: MailerRequestContext,
+  context: SendstackRequestContext,
   fetchImpl: typeof fetch,
-  parseResponse: MailerResponseParser,
-): Promise<MailerResponseContext> {
+  parseResponse: SendstackResponseParser,
+): Promise<SendstackResponseContext> {
   const response = await fetchImpl(context.url, {
     method: context.method,
     headers: context.headers,
@@ -949,19 +769,19 @@ async function transport(
 }
 
 async function runMiddlewareStack(
-  middleware: MailerMiddleware[],
-  context: MailerRequestContext,
-  terminal: (context: MailerRequestContext) => Promise<MailerResponseContext>,
-): Promise<MailerResponseContext> {
-  const pipeline = middleware.reduceRight<(context: MailerRequestContext) => Promise<MailerResponseContext>>(
-    (next, current) => async (requestContext: MailerRequestContext) => await current(requestContext, next),
+  middleware: SendstackMiddleware[],
+  context: SendstackRequestContext,
+  terminal: (context: SendstackRequestContext) => Promise<SendstackResponseContext>,
+): Promise<SendstackResponseContext> {
+  const pipeline = middleware.reduceRight<(context: SendstackRequestContext) => Promise<SendstackResponseContext>>(
+    (next, current) => async (requestContext: SendstackRequestContext) => await current(requestContext, next),
     terminal,
   );
 
   return await pipeline(context);
 }
 
-async function parseResponseBody(response: Response, _context: MailerRequestContext): Promise<unknown> {
+async function parseResponseBody(response: Response, _context: SendstackRequestContext): Promise<unknown> {
   const text = await response.text();
 
   if (text.trim() === "") {
@@ -981,8 +801,8 @@ async function parseResponseBody(response: Response, _context: MailerRequestCont
 }
 
 async function resolveAuthHeaders(
-  auth: MailerAuthStrategy,
-  context: MailerRequestContext,
+  auth: SendstackAuthStrategy,
+  context: SendstackRequestContext,
 ): Promise<Headers> {
   if (auth.type === "bearer") {
     const token = typeof auth.token === "function"
@@ -1005,7 +825,7 @@ function normalizeBaseUrl(baseUrl: string): string {
   try {
     parsed = new URL(baseUrl);
   } catch {
-    throw new TypeError("Mailer baseUrl must be a valid absolute URL.");
+    throw new TypeError("Sendstack baseUrl must be a valid absolute URL.");
   }
 
   parsed.hash = "";
@@ -1021,7 +841,7 @@ function buildRequestUrl(baseUrl: string, path: string): URL {
   }
 }
 
-function appendQueryParams(url: URL, query?: MailerQueryParams) {
+function appendQueryParams(url: URL, query?: SendstackQueryParams) {
   if (!query) {
     return;
   }
@@ -1044,12 +864,12 @@ function appendQueryParams(url: URL, query?: MailerQueryParams) {
   }
 }
 
-function serializeQueryValue(value: Exclude<MailerQueryValue, undefined>): string {
+function serializeQueryValue(value: Exclude<SendstackQueryValue, undefined>): string {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
-function mergeQueryParams(...parts: Array<MailerQueryParams | undefined>): MailerQueryParams | undefined {
-  const merged: MailerQueryParams = {};
+function mergeQueryParams(...parts: Array<SendstackQueryParams | undefined>): SendstackQueryParams | undefined {
+  const merged: SendstackQueryParams = {};
 
   for (const part of parts) {
     if (!part) {
@@ -1083,7 +903,7 @@ function mergeHeaders(...parts: Array<HeadersInit | undefined>): Headers {
   return headers;
 }
 
-function prepareRequestBody(body: MailerBody | undefined, headers: Headers): BodyInit | null | undefined {
+function prepareRequestBody(body: SendstackBody | undefined, headers: Headers): BodyInit | null | undefined {
   if (body === undefined) {
     return undefined;
   }
@@ -1099,7 +919,7 @@ function prepareRequestBody(body: MailerBody | undefined, headers: Headers): Bod
   return JSON.stringify(body);
 }
 
-function isNativeBody(body: MailerBody): body is BodyInit {
+function isNativeBody(body: SendstackBody): body is BodyInit {
   return typeof body === "string"
     || body instanceof Blob
     || body instanceof FormData
@@ -1117,7 +937,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function normalizeRetryPolicy(retry: MailerRetryOptions | number | false | undefined): NormalizedRetryPolicy {
+function normalizeRetryPolicy(retry: SendstackRetryOptions | number | false | undefined): NormalizedRetryPolicy {
   if (retry === false || retry === undefined) {
     return { maxAttempts: 1 };
   }
@@ -1140,9 +960,9 @@ function normalizeRetryPolicy(retry: MailerRetryOptions | number | false | undef
   };
 }
 
-function defaultShouldRetry(context: MailerRetryContext): boolean {
+function defaultShouldRetry(context: SendstackRetryContext): boolean {
   if (context.error) {
-    if (context.error instanceof MailerError) {
+    if (context.error instanceof SendstackError) {
       return false;
     }
 
@@ -1166,5 +986,5 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-export const SendstackClient = Mailer;
-export default Mailer;
+export const SendstackClient = Sendstack;
+export default Sendstack;

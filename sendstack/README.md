@@ -1,12 +1,16 @@
 # `@norialabs/sendstack`
 
-Official JavaScript SDK for Sendstack messaging APIs.
+Official JavaScript SDK for the SendStack email SaaS API.
 
 Use it for:
 
-- developer API email, SMS, WhatsApp, and health endpoints
-- merchant/control-plane messaging routes, including group email
-- custom auth, retries, middleware, and raw `request(...)` access
+- transactional and scheduled email
+- batch email
+- reusable attachment uploads
+- sending domains
+- email templates
+- webhook endpoints and webhook event retries
+- suppression lists
 
 Node `>=20` is required.
 
@@ -16,463 +20,345 @@ Node `>=20` is required.
 npm install @norialabs/sendstack
 ```
 
-## Shared Setup
-
-The examples below assume:
-
-```ts
-const BASE_URL = "https://sendstack.noria.co.ke/api/v1";
-const API_KEY = process.env.SENDSTACK_API_KEY!;
-const MERCHANT_TOKEN = process.env.SENDSTACK_MERCHANT_TOKEN!;
-const MERCHANT_ID = "merchant_123";
-```
-
-Change `BASE_URL` once if your Sendstack host changes.
-
 ## Quick Start
 
-### Developer API
-
 ```ts
-import { SendstackClient } from "@norialabs/sendstack";
+import { Sendstack } from "@norialabs/sendstack";
 
-const client = new SendstackClient(API_KEY, {
-  baseUrl: BASE_URL,
-});
+const token = process.env.SENDSTACK_TOKEN;
 
-const emailMessage = await client.emails.send(
+if (!token) {
+  throw new Error("SENDSTACK_TOKEN is required.");
+}
+
+const sendstack = new Sendstack(token);
+
+const message = await sendstack.emails.send(
   {
-    from: "Noria Demo <mail@noria.co.ke>",
-    to: ["hello@example.com"],
-    replyTo: ["support@noria.co.ke", "ops@noria.co.ke"],
-    subject: "Hello from Sendstack",
-    html: "<p>Your <strong>SDK</strong> is working.</p>",
-    text: "Your SDK is working.",
+    from: "Noria <hello@example.com>",
+    to: "friend@example.com",
+    subject: "Hello from SendStack",
+    html: "<p>Your email pipeline is working.</p>",
+    text: "Your email pipeline is working.",
   },
   {
     idempotencyKey: "welcome-email-1",
   },
 );
 
-const smsQuote = await client.sms.quote({
-  from: "SENDSTACK",
-  to: "+254722111222",
-  text: "Hello from SMS",
-});
-
-const whatsappMessage = await client.whatsapp.send({
-  from: "WABA",
-  to: "+254733000333",
-  text: "Hello from WhatsApp",
-});
-
-console.log(emailMessage.id, emailMessage.status);
-console.log(smsQuote.estimated_units);
-console.log(whatsappMessage.id, whatsappMessage.status);
+console.log(message.id, message.status);
 ```
 
-### Merchant API
+The SDK defaults to `https://mailer.norialabs.com`, matching the current live API. Override it when you move to the SendStack domain:
 
 ```ts
-import { SendstackClient } from "@norialabs/sendstack";
-
-const merchantClient = new SendstackClient({
-  baseUrl: BASE_URL,
-  auth: {
-    type: "bearer",
-    token: MERCHANT_TOKEN,
-  },
+const sendstack = new Sendstack({
+  token,
+  baseUrl: "https://sendstack.norialabs.com",
 });
-
-const groupQuote = await merchantClient.merchant.emails.quoteGroup(
-  MERCHANT_ID,
-  {
-    from: "sender@example.com",
-    to: ["a@example.com", "b@example.com"],
-    cc: "finance@example.com",
-    subject: "Monthly update",
-    html: "<p>Hello from the control plane</p>",
-    text: "Hello from the control plane",
-  },
-);
-
-const groupSend = await merchantClient.merchant.emails.sendGroup(
-  MERCHANT_ID,
-  {
-    from: "sender@example.com",
-    to: ["a@example.com", "b@example.com"],
-    replyTo: ["support@example.com", "ops@example.com"],
-    subject: "Monthly update",
-    html: "<p>Queued from the control plane</p>",
-    text: "Queued from the control plane",
-  },
-  {
-    idempotencyKey: "merchant-group-send-1",
-  },
-);
-
-console.log(groupQuote.estimated_units);
-console.log(groupSend.recipient_count);
 ```
 
-## How To Read The Examples
+## Docs Split
 
-- `client`
-  The main Sendstack SDK client.
-- `SendstackClient`
-  The package-aligned class name. `Mailer` is also exported for compatibility.
-- `client.emails`
-  The email part of the API.
-- `client.sms`
-  The SMS part of the API.
-- `client.whatsapp`
-  The WhatsApp part of the API.
-- `client.merchant`
-  Merchant and control-plane routes on a Sendstack client.
-- `quote(...)`
-  Ask Sendstack for the estimated units before sending.
-- `send(...)`
-  Queue a message for delivery.
-- `get(...)`
-  Fetch one message by ID.
-- `list(...)`
-  Fetch many messages, usually with filters or pagination.
-- variable names like `emailMessage`, `smsQuote`, and `groupSend`
-  These are just local JavaScript variables holding API responses.
+This README is the package guide: install, initialization, SDK methods, TypeScript names, request options, errors, and examples.
+
+The SaaS docs should remain the canonical source for product/API behavior: account setup, API tokens, domain verification, DNS records, webhook event catalogs, deliverability concepts, provider behavior, dashboard workflows, and raw HTTP API reference.
+
+Current live SaaS docs are at `https://mailer.norialabs.com/api/docs`. The old `/docs` path currently returns 404.
 
 ## Auth
 
-### Developer API Auth
-
-When you pass a non-empty first constructor argument, the SDK sends:
+The current API uses bearer auth:
 
 ```http
-X-API-Key: <apiKey>
+Authorization: Bearer <token>
 ```
 
+Passing a token as the first constructor argument configures that header automatically.
+
 ```ts
-const client = new SendstackClient(API_KEY, {
-  baseUrl: BASE_URL,
-});
+const sendstack = new Sendstack("mlr_live_...");
 ```
 
-That matches the current Sendstack developer API.
-
-### Merchant And Control-Plane Auth
-
-Merchant routes usually need a custom auth strategy instead of an API key.
+You can also pass custom auth:
 
 ```ts
-const merchantClient = new Mailer({
-  baseUrl: BASE_URL,
+const sendstack = new Sendstack({
   auth: {
     type: "bearer",
-    token: MERCHANT_TOKEN,
+    token: async () => await getFreshToken(),
   },
 });
 ```
 
-You can also use:
+## Method Reference
 
-- `type: "headers"` for custom header-based auth
-- request-level `auth` overrides for one call
-- explicit `authorization` or `x-api-key` headers when you do not want a default auth strategy
+| SDK method | HTTP route | Returns |
+| --- | --- | --- |
+| `attachments.upload(payload, options?)` | `POST /attachments` | `UploadedAttachment` |
+| `emails.send(payload, options?)` | `POST /emails` | `SendEmailResult` |
+| `emails.sendBatch(payload, options?)` | `POST /emails/batch` | `SendEmailBatchResult` |
+| `emails.list(options?)` | `GET /emails` | `CursorPage<EmailMessage>` |
+| `emails.get(messageId, options?)` | `GET /emails/{id}` | `EmailMessage` |
+| `emails.events(messageId, options?)` | `GET /emails/{id}/events` | `CursorPage<EmailEvent>` |
+| `emails.cancel(messageId, options?)` | `POST /emails/{id}/cancel` | `EmailMessage` |
+| `emails.requeue(messageId, options?)` | `POST /emails/{id}/requeue` | `EmailMessage` |
+| `domains.create(payload, options?)` | `POST /domains` | `Domain` |
+| `domains.list(options?)` | `GET /domains` | `CursorPage<Domain>` |
+| `domains.get(domainId, options?)` | `GET /domains/{id}` | `Domain` |
+| `domains.verify(domainId, options?)` | `POST /domains/{id}/verify` | `Domain` |
+| `templates.create(payload, options?)` | `POST /templates` | `EmailTemplate` |
+| `templates.list(options?)` | `GET /templates` | `CursorPage<EmailTemplate>` |
+| `templates.get(templateId, options?)` | `GET /templates/{id}` | `EmailTemplate` |
+| `templates.update(templateId, payload, options?)` | `PATCH /templates/{id}` | `EmailTemplate` |
+| `templates.remove(templateId, options?)` | `DELETE /templates/{id}` | `void` |
+| `webhooks.create(payload, options?)` | `POST /webhook-endpoints` | `WebhookEndpoint` |
+| `webhooks.list(options?)` | `GET /webhook-endpoints` | `CursorPage<WebhookEndpoint>` |
+| `webhooks.update(webhookId, payload, options?)` | `PATCH /webhook-endpoints/{id}` | `WebhookEndpoint` |
+| `webhooks.remove(webhookId, options?)` | `DELETE /webhook-endpoints/{id}` | `void` |
+| `webhookEvents.retry(eventId, options?)` | `POST /events/{id}/retry` | `RetryWebhookEventResult` |
+| `suppressions.add(payload, options?)` | `POST /suppressions` | `CreateSuppressionResult` |
+| `suppressions.list(options?)` | `GET /suppressions` | `CursorPage<Suppression>` |
+| `suppressions.remove(recipient, options?)` | `DELETE /suppressions/{recipient}` | `void` |
 
-## Developer API
-
-### Emails
-
-Available methods:
-
-- `client.emails.quote(payload, options?)`
-- `client.emails.send(payload, options?)`
-- `client.emails.get(messageId, options?)`
-- `client.emails.list(options?)`
-
-Example:
+## Emails
 
 ```ts
-const quote = await client.emails.quote({
-  from: "sender@example.com",
-  to: ["recipient@example.com"],
+await sendstack.emails.send({
+  from: "hello@example.com",
+  to: ["a@example.com", "b@example.com"],
+  replyTo: "support@example.com",
   subject: "Welcome",
-  html: "<p>Hello from Sendstack</p>",
-  text: "Hello from Sendstack",
-});
-
-const emailMessage = await client.emails.send({
-  from: "sender@example.com",
-  to: ["recipient@example.com"],
-  replyTo: ["support@example.com", "help@example.com"],
-  subject: "Welcome",
-  html: "<p>Hello from Sendstack</p>",
-  text: "Hello from Sendstack",
+  html: "<p>Hello</p>",
+  text: "Hello",
+  tags: [{ name: "campaign", value: "welcome" }],
+  metadata: { account: "acct_123" },
+  trackOpens: true,
+  trackClicks: true,
 });
 ```
 
-Notes:
-
-- Sendstack accepts plain text, HTML, or both.
-- Using both `html` and `text` is the recommended default.
-- The SDK accepts JavaScript-friendly aliases like `replyTo`, `scheduledAt`, and `listManagementOptions`.
-- Snake-case aliases like `reply_to` and `scheduled_at` are also accepted if you already have those payloads.
-
-### SMS
-
-Available methods:
-
-- `client.sms.quote(payload, options?)`
-- `client.sms.send(payload, options?)`
-- `client.sms.get(messageId, options?)`
-- `client.sms.list(options?)`
-
-Example:
+Batch sends accept either an array or `{ emails: [...] }`:
 
 ```ts
-const smsQuote = await client.sms.quote({
-  from: "SENDSTACK",
-  to: "+254722111222",
-  text: "Your verification code is 123456",
-});
-
-const smsMessage = await client.sms.send({
-  from: "SENDSTACK",
-  to: "+254722111222",
-  text: "Your verification code is 123456",
-});
-```
-
-The SDK accepts camel-case aliases like `contactId`, `templateId`, `providerConnectionId`, and `idempotencyKey`, then maps them to the current Sendstack wire format.
-
-### WhatsApp
-
-Available methods:
-
-- `client.whatsapp.quote(payload, options?)`
-- `client.whatsapp.send(payload, options?)`
-- `client.whatsapp.get(messageId, options?)`
-- `client.whatsapp.list(options?)`
-
-Plain-text example:
-
-```ts
-const whatsappMessage = await client.whatsapp.send({
-  from: "WABA",
-  to: "+254733000333",
-  text: "Hello from WhatsApp",
-});
-```
-
-Template example:
-
-```ts
-const templateQuote = await client.whatsapp.quote({
-  from: "WABA",
-  to: "+254733000333",
-  templateId: "template_123",
-  variables: {
-    first_name: "Mercy",
-  },
-});
-```
-
-Notes:
-
-- Use `text` for a plain WhatsApp message.
-- Use `templateId` plus `variables` for a template-based WhatsApp send.
-- `templateVariables` is accepted as an alias and is normalized to `variables`.
-
-### Health
-
-Available methods:
-
-- `client.health.live(options?)`
-- `client.health.check(options?)`
-- `client.health.ready(options?)`
-
-These default to unauthenticated requests and target the root service URL, not `/api/v1`.
-
-```ts
-await client.health.live();
-await client.health.check();
-await client.health.ready();
-```
-
-## Merchant API
-
-### Message History
-
-Available methods:
-
-- `client.merchant.messages.list(merchantId, options?)`
-- `client.merchant.messages.get(merchantId, messageId, options?)`
-
-```ts
-const merchantMessages = await merchantClient.merchant.messages.list(MERCHANT_ID, {
-  status: "queued",
-  channel: "email",
-  limit: 25,
-});
-```
-
-### Merchant Email
-
-Available methods:
-
-- `client.merchant.emails.quote(merchantId, payload, options?)`
-- `client.merchant.emails.quoteGroup(merchantId, payload, options?)`
-- `client.merchant.emails.send(merchantId, payload, options?)`
-- `client.merchant.emails.sendGroup(merchantId, payload, options?)`
-
-Use `sendGroup` when you want Sendstack’s merchant group-email flow.
-
-### Merchant SMS
-
-Available methods:
-
-- `client.merchant.sms.quote(merchantId, payload, options?)`
-- `client.merchant.sms.send(merchantId, payload, options?)`
-
-### Merchant WhatsApp
-
-Available methods:
-
-- `client.merchant.whatsapp.quote(merchantId, payload, options?)`
-- `client.merchant.whatsapp.send(merchantId, payload, options?)`
-
-## Pagination And Idempotency
-
-List endpoints accept:
-
-- `limit`
-- `cursor`
-- `perPage`
-- `status`
-- `channel` for `merchant.messages.list(...)`
-
-Example:
-
-```ts
-const emailsPage = await client.emails.list({
-  limit: 25,
-  cursor: "cursor_123",
-  perPage: 25,
-  status: "sent",
-});
-
-console.log(emailsPage.items, emailsPage.next_cursor, emailsPage.has_more);
-```
-
-For idempotent sends, pass `idempotencyKey` in request options:
-
-```ts
-await client.sms.send(
+await sendstack.emails.sendBatch([
   {
-    from: "SENDSTACK",
-    to: "+254722111222",
-    text: "Hello again",
+    from: "hello@example.com",
+    to: "a@example.com",
+    subject: "One",
+    text: "First email",
   },
   {
-    idempotencyKey: "sms-send-1",
+    from: "hello@example.com",
+    to: "b@example.com",
+    subject: "Two",
+    text: "Second email",
   },
-);
+]);
 ```
 
-## Raw Requests And Customization
+The SDK accepts TypeScript-friendly aliases like `replyTo`, `trackOpens`, `trackClicks`, `providerId`, `templateId`, `templateData`, and `scheduledAt`, then sends the snake-case API fields.
 
-Use `request(...)` when you need an endpoint that does not have a helper yet.
+## Attachments
 
 ```ts
-const result = await client.request("POST", "/emails/preview", {
-  body: {
-    from: "sender@example.com",
-    to: ["recipient@example.com"],
-    subject: "Preview me",
-    html: "<p>Preview</p>",
-    text: "Preview",
-  },
+const attachment = await sendstack.attachments.upload({
+  filename: "invoice.pdf",
+  contentBase64: invoicePdfBase64,
+  contentType: "application/pdf",
 });
-```
 
-Available constructor and request-level transport options:
-
-- `headers`
-- `query`
-- `timeoutMs`
-- `auth`
-- `retry`
-- `middleware`
-- `parseResponse`
-- `transformResponse`
-- request-level `fetch`
-
-Retry example:
-
-```ts
-const client = new Mailer(API_KEY, {
-  baseUrl: BASE_URL,
-  retry: {
-    maxAttempts: 2,
-  },
-});
-```
-
-Middleware example:
-
-```ts
-const client = new Mailer(API_KEY, {
-  baseUrl: BASE_URL,
-  middleware: [
-    async (request, next) => {
-      request.headers.set("x-sdk", "@norialabs/sendstack");
-      return await next(request);
+await sendstack.emails.send({
+  from: "billing@example.com",
+  to: "customer@example.com",
+  subject: "Invoice",
+  text: "Attached.",
+  attachments: [
+    {
+      filename: "invoice.pdf",
+      attachmentId: attachment.attachment_id,
     },
   ],
 });
 ```
 
-## Error Handling
+## Domains
 
 ```ts
-import { Mailer, MailerError } from "@norialabs/sendstack";
+const domain = await sendstack.domains.create({
+  domain: "example.com",
+  region: "af-south-1",
+  tls: "enforced",
+  capabilities: { sending: "enabled" },
+});
+
+await sendstack.domains.verify(domain.id);
+```
+
+## Templates
+
+```ts
+const template = await sendstack.templates.create({
+  name: "Welcome",
+  slug: "welcome",
+  subject: "Welcome, {{firstName}}",
+  html: "<p>Hello {{firstName}}</p>",
+  text: "Hello {{firstName}}",
+});
+
+await sendstack.emails.send({
+  from: "hello@example.com",
+  to: "friend@example.com",
+  template: {
+    id: template.id,
+    variables: { firstName: "Amina" },
+  },
+});
+```
+
+## Webhooks
+
+```ts
+const endpoint = await sendstack.webhooks.create({
+  url: "https://example.com/webhooks/sendstack",
+  eventTypes: ["email.sent", "email.failed"],
+});
+
+await sendstack.webhookEvents.retry("event_123");
+await sendstack.webhooks.update(endpoint.id, { enabled: false });
+```
+
+## Suppressions
+
+```ts
+await sendstack.suppressions.add({
+  recipient: "bad@example.com",
+  reason: "manual",
+});
+
+const suppressions = await sendstack.suppressions.list();
+await sendstack.suppressions.remove("bad@example.com");
+```
+
+## Request Options
+
+All methods accept request options. Mutating methods also accept `idempotencyKey`.
+
+```ts
+await sendstack.emails.send(
+  {
+    from: "hello@example.com",
+    to: "friend@example.com",
+    subject: "Hello",
+    text: "Hello",
+  },
+  {
+    idempotencyKey: "email-123",
+    timeoutMs: 10_000,
+    query: { debug: true },
+  },
+);
+```
+
+Supported client/request options:
+
+- `fetch`: custom Fetch implementation
+- `headers`: extra headers
+- `query`: default or per-request query params
+- `timeoutMs`: request timeout, default `30000`
+- `signal`: per-request `AbortSignal`
+- `authenticated`: set `false` to strip auth headers for a request
+- `auth`: bearer or custom header auth strategy
+- `retry`: retry config, retry count, or `false`
+- `middleware`: request/response middleware
+- `parseResponse`: custom response parser
+- `transformResponse`: custom response transformer
+- `unwrapData`: unwrap `{ ok: true, data }` envelopes, default `true`
+
+## Lower-Level Request
+
+Every resource method uses `request(...)` internally. Use it directly for new API routes before the SDK grows a typed wrapper.
+
+```ts
+const result = await sendstack.request("GET", "/emails", {
+  query: {
+    limit: 25,
+    status: "queued",
+  },
+});
+```
+
+## Errors
+
+Failed responses throw `SendstackError`.
+
+```ts
+import { SendstackError } from "@norialabs/sendstack";
 
 try {
-  await client.emails.send({
-    from: "sender@example.com",
-    to: ["recipient@example.com"],
+  await sendstack.emails.send({
+    from: "hello@example.com",
+    to: "bad",
     subject: "Hello",
-    text: "World",
+    text: "Hello",
   });
 } catch (error) {
-  if (error instanceof MailerError) {
-    console.error(error.statusCode, error.code, error.message, error.details, error.responseBody);
+  if (error instanceof SendstackError) {
+    console.error(error.statusCode, error.code, error.message, error.details);
   }
 }
 ```
 
-`MailerError` includes:
+`SendstackError` includes:
 
 - `statusCode`
 - `code`
 - `details`
 - `responseBody`
 
-The SDK understands both:
+## Exports
 
-- compatibility envelopes like `{ ok: false, error: ... }`
-- Sendstack/FastAPI responses like `{ detail: "..." }`
+Runtime exports:
 
-## Compatibility Appendix
+- `Sendstack`
+- `SendstackClient`
+- `SendstackError`
+- `DEFAULT_BASE_URL`
+- default export: `Sendstack`
 
-The package keeps a few helpers for older fully compatible APIs:
+Important type exports:
 
-- `client.domains`
-- `client.apiKeys`
-- `client.webhooks`
-- `client.emails.sendBatch(...)`
+- `SendstackClientOptions`
+- `SendstackRequestOptions`
+- `SendstackMutationOptions`
+- `SendstackRawRequestOptions`
+- `SendstackAuthStrategy`
+- `SendstackRetryOptions`
+- `SendstackMiddleware`
+- `SendEmailRequest`
+- `SendEmailResult`
+- `SendEmailBatchRequest`
+- `SendEmailBatchResult`
+- `EmailMessage`
+- `EmailEvent`
+- `UploadAttachmentRequest`
+- `UploadedAttachment`
+- `CreateDomainRequest`
+- `Domain`
+- `CreateTemplateRequest`
+- `UpdateTemplateRequest`
+- `EmailTemplate`
+- `CreateWebhookEndpointRequest`
+- `UpdateWebhookEndpointRequest`
+- `WebhookEndpoint`
+- `RetryWebhookEventResult`
+- `CreateSuppressionRequest`
+- `CreateSuppressionResult`
+- `Suppression`
+- `CursorPage`
 
-These are not part of the current Sendstack developer messaging surface, but they remain available when you are targeting a compatible API.
+## Relationship To `@norialabs/sendkit`
 
-## License
+`@norialabs/sendstack` is for the SendStack email SaaS API.
 
-[MIT](./LICENSE)
+Use `@norialabs/sendkit` for WhatsApp and bulk SMS gateway wrappers.
