@@ -18,6 +18,10 @@ test("MetaWhatsAppClient supports sends, templates, media, and parsing helpers",
         body: init.body,
       });
 
+      if (url.endsWith("/messages") && JSON.parse(init.body).status === "read") {
+        return jsonResponse({ success: true });
+      }
+
       if (url.endsWith("/messages")) {
         return jsonResponse({
           contacts: [{ wa_id: "254700123456" }],
@@ -92,6 +96,64 @@ test("MetaWhatsAppClient supports sends, templates, media, and parsing helpers",
   assert.equal(text.messages[0].providerMessageId, "wamid.1");
   assert.equal(calls[0].url, `https://graph.facebook.com/${META_GRAPH_API_VERSION}/123456789/messages`);
 
+  const template = await client.sendTemplate({
+    recipient: "254700123456",
+    templateName: "order_update",
+    languageCode: "en_US",
+    components: [
+      {
+        type: "header",
+        parameters: [
+          {
+            type: "document",
+            value: "media-doc-1",
+          },
+        ],
+      },
+      {
+        type: "body",
+        parameters: [{ type: "text", value: "NORIA-123" }],
+      },
+      {
+        type: "button",
+        subType: "quick_reply",
+        index: 0,
+        parameters: [{ type: "payload", value: "track-order" }],
+      },
+    ],
+  });
+  assert.equal(template.accepted, true);
+  assert.deepEqual(JSON.parse(calls.at(-1).body).template.components, [
+    {
+      type: "header",
+      parameters: [{ type: "document", document: { id: "media-doc-1" } }],
+    },
+    {
+      type: "body",
+      parameters: [{ type: "text", text: "NORIA-123" }],
+    },
+    {
+      type: "button",
+      sub_type: "quick_reply",
+      index: 0,
+      parameters: [{ type: "payload", payload: "track-order" }],
+    },
+  ]);
+
+  const media = await client.sendMedia({
+    recipient: "254700123456",
+    mediaType: "document",
+    link: "https://example.com/menu.pdf",
+    caption: "Menu",
+    filename: "menu.pdf",
+  });
+  assert.equal(media.accepted, true);
+  assert.deepEqual(JSON.parse(calls.at(-1).body).document, {
+    link: "https://example.com/menu.pdf",
+    caption: "Menu",
+    filename: "menu.pdf",
+  });
+
   const interactive = await client.sendInteractive({
     recipient: "254700123456",
     interactiveType: "button",
@@ -114,6 +176,23 @@ test("MetaWhatsAppClient supports sends, templates, media, and parsing helpers",
     flowId: "flow-1",
   });
   assert.equal(flow.messages[0].providerMessageId, "wamid.1");
+
+  const read = await client.markMessageRead({ messageId: "wamid.inbound.1" });
+  assert.equal(read.success, true);
+  assert.deepEqual(JSON.parse(calls.at(-1).body), {
+    messaging_product: "whatsapp",
+    status: "read",
+    message_id: "wamid.inbound.1",
+  });
+
+  const typing = await client.sendTypingIndicator({ messageId: "wamid.inbound.2" });
+  assert.equal(typing.messageId, "wamid.inbound.2");
+  assert.deepEqual(JSON.parse(calls.at(-1).body), {
+    messaging_product: "whatsapp",
+    status: "read",
+    message_id: "wamid.inbound.2",
+    typing_indicator: { type: "text" },
+  });
 
   const templates = await client.listTemplates({ limit: 10 });
   assert.equal(templates.templates[0].templateId, "tmpl-1");

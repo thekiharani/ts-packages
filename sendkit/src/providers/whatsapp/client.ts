@@ -39,9 +39,11 @@ import type {
   WhatsAppProductListRequest,
   WhatsAppProductMessageRequest,
   WhatsAppProductSection,
+  WhatsAppReadRequest,
   WhatsAppReactionRequest,
   WhatsAppSendReceipt,
   WhatsAppSendResult,
+  WhatsAppStatusResult,
   WhatsAppTemplateButtonDefinition,
   WhatsAppTemplateComponent,
   WhatsAppTemplateComponentDefinition,
@@ -256,6 +258,30 @@ export class MetaWhatsAppClient implements WhatsAppTemplateManagementClient {
     return this.sendRequest(request.recipient, buildFlowMessagePayload(request), options);
   }
 
+  async markMessageRead(
+    request: WhatsAppReadRequest,
+    options?: RequestOptions,
+  ): Promise<WhatsAppStatusResult> {
+    const response = await this.request(this.messagesPath(), "POST", {
+      body: buildReadPayload(request, false),
+      options,
+    });
+
+    return buildStatusResult(this.providerName, request.messageId, response);
+  }
+
+  async sendTypingIndicator(
+    request: WhatsAppReadRequest,
+    options?: RequestOptions,
+  ): Promise<WhatsAppStatusResult> {
+    const response = await this.request(this.messagesPath(), "POST", {
+      body: buildReadPayload(request, true),
+      options,
+    });
+
+    return buildStatusResult(this.providerName, request.messageId, response);
+  }
+
   async uploadMedia(
     request: WhatsAppMediaUploadRequest,
     options?: RequestOptions,
@@ -451,6 +477,19 @@ function buildMediaUploadResult(
   return {
     provider: providerName,
     mediaId,
+    raw: response,
+  };
+}
+
+function buildStatusResult(
+  providerName: string,
+  messageId: string,
+  response: Record<string, unknown>,
+): WhatsAppStatusResult {
+  return {
+    provider: providerName,
+    success: Boolean(response["success"]),
+    messageId,
     raw: response,
   };
 }
@@ -1000,6 +1039,21 @@ function buildFlowMessagePayload(request: WhatsAppFlowMessageRequest): Record<st
     messageBody: buildFlowInteractivePayload(request),
     replyToMessageId: request.replyToMessageId,
     providerOptions: request.providerOptions,
+  });
+}
+
+function buildReadPayload(
+  request: WhatsAppReadRequest,
+  includeTypingIndicator: boolean,
+): Record<string, unknown> {
+  return compactRecord({
+    ...(request.providerOptions ?? {}),
+    messaging_product: "whatsapp",
+    status: "read",
+    message_id: requireText(request.messageId, "messageId"),
+    typing_indicator: includeTypingIndicator
+      ? { type: request.typingIndicatorType ?? "text" }
+      : undefined,
   });
 }
 

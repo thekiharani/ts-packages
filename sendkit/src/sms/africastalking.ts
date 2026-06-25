@@ -6,8 +6,14 @@ export {
 } from "../providers/sms/africastalking";
 export type {
   AfricasTalkingDeliveryReport,
+  AfricasTalkingFetchMessagesRequest,
+  AfricasTalkingFetchMessagesResult,
+  AfricasTalkingIncomingMessage,
+  AfricasTalkingPremiumSmsRequest,
   AfricasTalkingSmsClientOptions,
   AfricasTalkingSmsFromEnvOptions,
+  AfricasTalkingSubscriptionRequest,
+  AfricasTalkingSubscriptionResult,
   SmsBalance,
   SmsBalanceEntry,
   SmsClient,

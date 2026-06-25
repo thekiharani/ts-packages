@@ -378,6 +378,22 @@ export interface WhatsAppFlowMessageRequest {
   providerOptions?: Record<string, unknown>;
 }
 
+export type WhatsAppTypingIndicatorType = "text";
+
+export interface WhatsAppReadRequest {
+  messageId: string;
+  typingIndicatorType?: WhatsAppTypingIndicatorType;
+  metadata?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface WhatsAppStatusResult {
+  provider: string;
+  success: boolean;
+  messageId?: string;
+  raw?: unknown;
+}
+
 export interface WhatsAppMediaUploadRequest {
   filename: string;
   content: Buffer | Uint8Array | ArrayBuffer;
@@ -523,6 +539,8 @@ export interface WhatsAppClient {
     options?: RequestOptions,
   ): Promise<WhatsAppSendResult>;
   sendFlow(request: WhatsAppFlowMessageRequest, options?: RequestOptions): Promise<WhatsAppSendResult>;
+  markMessageRead(request: WhatsAppReadRequest, options?: RequestOptions): Promise<WhatsAppStatusResult>;
+  sendTypingIndicator(request: WhatsAppReadRequest, options?: RequestOptions): Promise<WhatsAppStatusResult>;
   uploadMedia(
     request: WhatsAppMediaUploadRequest,
     options?: RequestOptions,
