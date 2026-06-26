@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
     }
   },
   "engines": {
@@ -36,8 +40,8 @@
     "url": "https://github.com/thekiharani/ts-packages/issues"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --sourcemap --clean --target node20 --out-dir dist",
-    "build:dist": "tsup src/index.ts --format esm --dts --clean --target node20 --out-dir dist",
+    "build": "tsup src/index.ts src/node.ts --format esm --dts --sourcemap --clean --target node20 --out-dir dist",
+    "build:dist": "tsup src/index.ts src/node.ts --format esm --dts --clean --target node20 --out-dir dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/test.mjs",
     "test:run": "npm run build && node scripts/run-node-tests.mjs",

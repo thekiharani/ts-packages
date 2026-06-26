@@ -182,6 +182,45 @@ await sendstack.emails.send({
 });
 ```
 
+### Reading from files (Node)
+
+The core SDK is isomorphic and never touches the filesystem — `html`/`text` are
+plain strings and attachments are base64. For Node apps, the optional
+`@norialabs/sendstack/node` entrypoint does the read-and-encode step for you. It
+imports `node:fs`, so it lives in a separate subpath to keep the core
+browser/edge-safe.
+
+```ts
+import { Sendstack } from "@norialabs/sendstack";
+import {
+  htmlFromFile,
+  textFromFile,
+  attachmentFromFile,
+  attachmentFromBuffer,
+} from "@norialabs/sendstack/node";
+
+await sendstack.emails.send({
+  from: "billing@example.com",
+  to: "customer@example.com",
+  subject: "Your invoice",
+  html: await htmlFromFile("./templates/invoice.html"),
+  text: await textFromFile("./templates/invoice.txt"),
+  attachments: [
+    // From a path — filename defaults to the basename, content is base64-encoded.
+    await attachmentFromFile("./invoices/2026-06.pdf", { contentType: "application/pdf" }),
+    // From in-memory bytes (e.g. a generated PDF) — filename is required.
+    attachmentFromBuffer(generatedPdf, { filename: "summary.pdf", contentType: "application/pdf" }),
+  ],
+});
+```
+
+- `htmlFromFile(path)` / `textFromFile(path)` — read a UTF-8 file into a string.
+- `attachmentFromFile(path, options?)` — read a file into an `EmailAttachmentInput`
+  (base64). `options` accepts `filename` (defaults to the basename), `contentType`,
+  `inline`, and `contentId`. `path` may be a string or a `file:` URL.
+- `attachmentFromBuffer(data, options)` — encode a `Buffer`/`Uint8Array`; `filename`
+  is required.
+
 ## Domains
 
 ```ts
