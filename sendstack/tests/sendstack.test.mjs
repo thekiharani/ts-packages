@@ -126,6 +126,26 @@ function suppression(overrides = {}) {
   };
 }
 
+function sms(overrides = {}) {
+  return {
+    id: "sms_1",
+    status: "queued",
+    to: "+254700000000",
+    body: "Your code is 1234",
+    segments: 1,
+    sender_id: "NORIA",
+    provider_id: null,
+    provider_message_id: null,
+    attempts: 0,
+    scheduled_at: null,
+    sent_at: null,
+    last_error: null,
+    metadata: {},
+    created_at: "2026-06-25T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 test("exports Sendstack-first names", () => {
   assert.equal(DEFAULT_BASE_URL, "https://sendstack.norialabs.com/api/v1");
   assert.equal(SendstackClient, Sendstack);
@@ -516,6 +536,202 @@ test("all OpenAPI resource methods hit the expected SendStack endpoints", async 
   })).recipient, "bad@example.com");
   assert.equal((await client.suppressions.list()).data[0].recipient, "bad@example.com");
   assert.equal(await client.suppressions.remove("bad@example.com"), undefined);
+});
+
+test("sms.* endpoints normalize aliases and apply the client sender_id with per-send override", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    senderId: "NORIA",
+    fetch: createSequenceFetch([
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            to: "+254700000000",
+            body: "Your code is 1234",
+            sender_id: "NORIA",
+            provider_id: "prov_1",
+            template_id: "tpl_otp",
+            template_data: { code: "1234" },
+            scheduled_at: "2026-01-01T00:00:00.000Z",
+          });
+        },
+        response: createJsonResponse(sms(), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms");
+          assert.deepEqual(JSON.parse(init.body), {
+            to: "+254700000001",
+            body: "Hi",
+            sender_id: "OTHER",
+          });
+        },
+        response: createJsonResponse(sms({ sender_id: "OTHER" }), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/batch");
+          assert.deepEqual(JSON.parse(init.body), {
+            messages: [
+              { to: "+254700000002", body: "One", sender_id: "NORIA" },
+              { to: "+254700000003", body: "Two", sender_id: "KEEP" },
+            ],
+          });
+        },
+        response: createJsonResponse({
+          batch_id: "smsbatch_1",
+          data: [{ id: "sms_2", status: "queued" }],
+        }, { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/batch");
+          assert.deepEqual(JSON.parse(init.body), [
+            { to: "+254700000004", body: "Solo", sender_id: "NORIA" },
+          ]);
+        },
+        response: createJsonResponse({
+          batch_id: "smsbatch_2",
+          data: [{ id: "sms_3", status: "queued" }],
+        }, { status: 202 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(
+            String(input),
+            "https://mailer.norialabs.com/api/sms?limit=10&cursor=cur_1&status=sent",
+          );
+        },
+        response: createJsonResponse(page([sms()], "cur_2")),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/sms%201");
+        },
+        response: createJsonResponse(sms({ id: "sms 1" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/sms_1/events");
+        },
+        response: createJsonResponse(page([
+          { id: "evt_1", type: "sms.delivered", occurredAt: "2026-06-25T00:00:00.000Z" },
+        ])),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/sms_1/cancel");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse(sms({ status: "canceled" })),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/sms_1/requeue");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse(sms({ status: "queued" })),
+      },
+    ]),
+  });
+
+  assert.equal(client.senderId, "NORIA");
+  assert.equal((await client.sms.send({
+    to: "+254700000000",
+    body: "Your code is 1234",
+    providerId: "prov_1",
+    templateId: "tpl_otp",
+    templateData: { code: "1234" },
+    scheduledAt: new Date("2026-01-01T00:00:00.000Z"),
+  })).id, "sms_1");
+  assert.equal((await client.sms.send({
+    to: "+254700000001",
+    body: "Hi",
+    senderId: "OTHER",
+  })).sender_id, "OTHER");
+  assert.equal((await client.sms.sendBatch({
+    messages: [
+      { to: "+254700000002", body: "One" },
+      { to: "+254700000003", body: "Two", senderId: "KEEP" },
+    ],
+  })).batch_id, "smsbatch_1");
+  assert.equal((await client.sms.sendBatch([
+    { to: "+254700000004", body: "Solo" },
+  ])).batch_id, "smsbatch_2");
+  assert.equal((await client.sms.list({ limit: 10, cursor: "cur_1", status: "sent" })).next_cursor, "cur_2");
+  assert.equal((await client.sms.get("sms 1")).id, "sms 1");
+  assert.equal((await client.sms.events("sms_1")).data[0].type, "sms.delivered");
+  assert.equal((await client.sms.cancel("sms_1")).status, "canceled");
+  assert.equal((await client.sms.requeue("sms_1")).status, "queued");
+});
+
+test("sms.send without a client sender_id omits it; templates support preview, channel, and sampleData", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    fetch: createSequenceFetch([
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms");
+          assert.deepEqual(JSON.parse(init.body), { to: "+254700000000", body: "Hi" });
+        },
+        response: createJsonResponse(sms({ sender_id: null }), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates/preview");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            template_id: "tpl_otp",
+            data: { code: "1234" },
+          });
+        },
+        response: createJsonResponse({
+          channel: "sms",
+          subject: null,
+          html: null,
+          text: null,
+          body: "Your code is 1234",
+          segments: 1,
+          variables: ["code"],
+        }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            channel: "sms",
+            name: "otp",
+            body: "Your code is {{ code }}",
+            sample_data: { code: "1234" },
+          });
+        },
+        response: createJsonResponse(template({ channel: "sms" }), { status: 201 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates?channel=sms");
+        },
+        response: createJsonResponse(page([template({ channel: "sms" })])),
+      },
+    ]),
+  });
+
+  assert.equal(client.senderId, undefined);
+  assert.equal((await client.sms.send({ to: "+254700000000", body: "Hi" })).id, "sms_1");
+  assert.equal((await client.templates.preview({
+    templateId: "tpl_otp",
+    data: { code: "1234" },
+  })).segments, 1);
+  assert.equal((await client.templates.create({
+    channel: "sms",
+    name: "otp",
+    body: "Your code is {{ code }}",
+    sampleData: { code: "1234" },
+  })).id, "tpl_1");
+  assert.equal((await client.templates.list({ channel: "sms" })).data[0].id, "tpl_1");
 });
 
 test("raw request supports middleware, custom auth, query serialization, native bodies, and transforms", async () => {

@@ -11,11 +11,21 @@ import type {
   EmailMessage,
   EmailTemplate,
   ListEmailsOptions,
+  ListSmsOptions,
+  ListTemplatesOptions,
+  PreviewTemplateRequest,
   RetryWebhookEventResult,
   SendEmailBatchRequest,
   SendEmailBatchResult,
   SendEmailRequest,
   SendEmailResult,
+  SendSmsBatchRequest,
+  SendSmsBatchResult,
+  SendSmsRequest,
+  SendSmsResult,
+  SmsMessage,
+  SmsEvent,
+  TemplatePreview,
   SendstackAuthStrategy,
   SendstackBody,
   SendstackClientOptions,
@@ -62,12 +72,25 @@ export type {
   ErrorEnvelope,
   KnownWebhookEvent,
   ListEmailsOptions,
+  ListSmsOptions,
+  ListTemplatesOptions,
+  PreviewTemplateRequest,
   Recipient,
   RetryWebhookEventResult,
   SendEmailBatchRequest,
   SendEmailBatchResult,
   SendEmailRequest,
   SendEmailResult,
+  SendSmsBatchRequest,
+  SendSmsBatchResult,
+  SendSmsRequest,
+  SendSmsResult,
+  SmsEvent,
+  SmsMessage,
+  SmsStatus,
+  TemplateChannel,
+  TemplatePreview,
+  TemplateVariable,
   SendstackAuthStrategy,
   SendstackBearerAuthStrategy,
   SendstackBody,
@@ -105,6 +128,7 @@ interface NormalizedRetryPolicy {
 
 export class Sendstack {
   readonly token: string;
+  readonly senderId: string | undefined;
   readonly baseUrl: string;
   readonly timeoutMs: number;
   readonly attachments: {
@@ -144,7 +168,7 @@ export class Sendstack {
       request: TRequest,
       options?: SendstackMutationOptions,
     ) => Promise<EmailTemplate>;
-    list: (options?: SendstackRequestOptions) => Promise<CursorPage<EmailTemplate>>;
+    list: (options?: ListTemplatesOptions & SendstackRequestOptions) => Promise<CursorPage<EmailTemplate>>;
     get: (id: string, options?: SendstackRequestOptions) => Promise<EmailTemplate>;
     update: <TRequest extends UpdateTemplateRequest>(
       id: string,
@@ -152,6 +176,27 @@ export class Sendstack {
       options?: SendstackMutationOptions,
     ) => Promise<EmailTemplate>;
     remove: (id: string, options?: SendstackMutationOptions) => Promise<void>;
+    preview: <TRequest extends PreviewTemplateRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<TemplatePreview>;
+  };
+  readonly sms: {
+    send: <TRequest extends SendSmsRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SendSmsResult>;
+    sendBatch: <TRequest extends SendSmsBatchRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SendSmsBatchResult>;
+    list: <TOptions extends ListSmsOptions & SendstackRequestOptions>(
+      options?: TOptions,
+    ) => Promise<CursorPage<SmsMessage>>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<SmsMessage>;
+    events: (id: string, options?: SendstackRequestOptions) => Promise<CursorPage<SmsEvent>>;
+    cancel: (id: string, options?: SendstackMutationOptions) => Promise<SmsMessage>;
+    requeue: (id: string, options?: SendstackMutationOptions) => Promise<SmsMessage>;
   };
   readonly webhooks: {
     create: <TRequest extends CreateWebhookEndpointRequest>(
@@ -201,8 +246,10 @@ export class Sendstack {
     }
 
     const normalizedToken = token.trim();
+    const normalizedSenderId = (options.senderId ?? "").trim();
 
     this.token = normalizedToken;
+    this.senderId = normalizedSenderId === "" ? undefined : normalizedSenderId;
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.#fetch = options.fetch ?? fetch;
@@ -286,17 +333,20 @@ export class Sendstack {
       create: (request, requestOptions) =>
         this.request("POST", "/templates", {
           ...requestOptions,
-          body: request,
+          body: normalizeTemplateRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
       list: (requestOptions) =>
-        this.request("GET", "/templates", requestOptions),
+        this.request("GET", "/templates", {
+          ...requestOptions,
+          query: mergeTemplateListQuery(requestOptions),
+        }),
       get: (id, requestOptions) =>
         this.request("GET", `/templates/${encodeURIComponent(id)}`, requestOptions),
       update: (id, request, requestOptions) =>
         this.request("PATCH", `/templates/${encodeURIComponent(id)}`, {
           ...requestOptions,
-          body: request,
+          body: normalizeTemplateRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
       remove: async (id, requestOptions) => {
@@ -305,6 +355,46 @@ export class Sendstack {
           idempotencyKey: requestOptions?.idempotencyKey,
         });
       },
+      preview: (request, requestOptions) =>
+        this.request("POST", "/templates/preview", {
+          ...requestOptions,
+          body: normalizeTemplatePreviewRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+    };
+
+    this.sms = {
+      send: (request, requestOptions) =>
+        this.request("POST", "/sms", {
+          ...requestOptions,
+          body: normalizeSendSmsRequest(request, this.senderId),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      sendBatch: (request, requestOptions) =>
+        this.request("POST", "/sms/batch", {
+          ...requestOptions,
+          body: normalizeSendSmsBatchRequest(request, this.senderId),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      list: (requestOptions) =>
+        this.request("GET", "/sms", {
+          ...requestOptions,
+          query: mergeSmsListQuery(requestOptions),
+        }),
+      get: (id, requestOptions) =>
+        this.request("GET", `/sms/${encodeURIComponent(id)}`, requestOptions),
+      events: (id, requestOptions) =>
+        this.request("GET", `/sms/${encodeURIComponent(id)}/events`, requestOptions),
+      cancel: (id, requestOptions) =>
+        this.request("POST", `/sms/${encodeURIComponent(id)}/cancel`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      requeue: (id, requestOptions) =>
+        this.request("POST", `/sms/${encodeURIComponent(id)}/requeue`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
     };
 
     this.webhooks = {
@@ -610,6 +700,55 @@ function normalizeWebhookEndpointRequest(
   return payload;
 }
 
+function normalizeTemplateRequest(
+  request: CreateTemplateRequest | UpdateTemplateRequest,
+): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "sampleData", "sample_data");
+  return payload;
+}
+
+function normalizeTemplatePreviewRequest(request: PreviewTemplateRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "templateId", "template_id");
+  return payload;
+}
+
+function normalizeSendSmsBatchRequest(
+  request: SendSmsBatchRequest,
+  defaultSenderId: string | undefined,
+): Record<string, unknown> | Array<Record<string, unknown>> {
+  if (Array.isArray(request)) {
+    return request.map((message) => normalizeSendSmsRequest(message, defaultSenderId));
+  }
+
+  return {
+    messages: request.messages.map((message) => normalizeSendSmsRequest(message, defaultSenderId)),
+  };
+}
+
+function normalizeSendSmsRequest(
+  request: SendSmsRequest,
+  defaultSenderId: string | undefined,
+): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "senderId", "sender_id");
+  renameAlias(payload, "providerId", "provider_id");
+  renameAlias(payload, "templateId", "template_id");
+  renameAlias(payload, "templateData", "template_data");
+  renameAlias(payload, "scheduledAt", "scheduled_at");
+
+  if (payload["scheduled_at"] instanceof Date) {
+    payload["scheduled_at"] = payload["scheduled_at"].toISOString();
+  }
+
+  if (defaultSenderId !== undefined && payload["sender_id"] === undefined) {
+    payload["sender_id"] = defaultSenderId;
+  }
+
+  return payload;
+}
+
 function renameAlias(payload: Record<string, unknown>, sourceName: string, targetName: string) {
   if (sourceName in payload && !(targetName in payload)) {
     payload[targetName] = payload[sourceName];
@@ -684,6 +823,30 @@ function mergeEmailListQuery(
       limit: options?.limit,
       cursor: options?.cursor,
       status: options?.status,
+    },
+    options?.query,
+  );
+}
+
+function mergeSmsListQuery(
+  options?: ListSmsOptions & SendstackRequestOptions,
+): SendstackQueryParams | undefined {
+  return mergeQueryParams(
+    {
+      limit: options?.limit,
+      cursor: options?.cursor,
+      status: options?.status,
+    },
+    options?.query,
+  );
+}
+
+function mergeTemplateListQuery(
+  options?: ListTemplatesOptions & SendstackRequestOptions,
+): SendstackQueryParams | undefined {
+  return mergeQueryParams(
+    {
+      channel: options?.channel,
     },
     options?.query,
   );
