@@ -83,5 +83,5 @@ test("contract has no duplicate routes", () => {
   const data = JSON.parse(readFileSync(join(HERE, "conformance-routes.json"), "utf8"));
   const pairs = data.routes.map((route) => `${route.method} ${route.path}`);
   assert.equal(pairs.length, new Set(pairs).size);
-  assert.equal(pairs.length, 25);
+  assert.equal(pairs.length, 33);
 });
