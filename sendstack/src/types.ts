@@ -10,6 +10,8 @@ export type SendstackBody =
   | null;
 
 export type EmailStatus = "queued" | "sending" | "sent" | "failed" | "canceled";
+export type SmsStatus = EmailStatus;
+export type TemplateChannel = "email" | "sms";
 export type DomainRegion = "af-south-1" | "us-east-1" | "eu-central-1";
 export type DomainTlsPolicy = "opportunistic" | "enforced";
 export type DomainCapability = "enabled" | "disabled";
@@ -162,18 +164,59 @@ export interface Domain {
   [key: string]: unknown;
 }
 
+export interface TemplateVariable {
+  name: string;
+  required?: boolean;
+  description?: string;
+  example?: string;
+}
+
 export interface CreateTemplateRequest {
+  channel?: TemplateChannel;
   name: string;
   slug?: string;
-  subject: string;
+  subject?: string;
   html?: string;
   text?: string;
+  body?: string;
+  variables?: TemplateVariable[];
+  sampleData?: Record<string, unknown>;
+  sample_data?: Record<string, unknown>;
 }
 
 export interface UpdateTemplateRequest {
   subject?: string;
   html?: string | null;
   text?: string | null;
+  body?: string;
+  variables?: TemplateVariable[];
+  sampleData?: Record<string, unknown>;
+  sample_data?: Record<string, unknown>;
+}
+
+export interface PreviewTemplateRequest {
+  templateId?: string;
+  template_id?: string;
+  channel?: TemplateChannel;
+  subject?: string;
+  html?: string;
+  text?: string;
+  body?: string;
+  data?: Record<string, unknown>;
+}
+
+export interface TemplatePreview {
+  channel: string;
+  subject: string | null;
+  html: string | null;
+  text: string | null;
+  body: string | null;
+  segments: number | null;
+  variables: string[];
+}
+
+export interface ListTemplatesOptions {
+  channel?: TemplateChannel;
 }
 
 export interface EmailTemplate {
@@ -185,6 +228,66 @@ export interface EmailTemplate {
   textBody: string | null;
   createdAt: string;
   [key: string]: unknown;
+}
+
+export interface SendSmsRequest {
+  to: string;
+  body?: string;
+  senderId?: string;
+  sender_id?: string;
+  providerId?: string;
+  provider_id?: string;
+  metadata?: Record<string, string>;
+  templateId?: string;
+  template_id?: string;
+  templateData?: Record<string, unknown>;
+  template_data?: Record<string, unknown>;
+  scheduledAt?: string | Date;
+  scheduled_at?: string | Date;
+}
+
+export type SendSmsBatchRequest = SendSmsRequest[] | {
+  messages: SendSmsRequest[];
+};
+
+export interface SendSmsResult {
+  id: string;
+  status: string;
+}
+
+export interface SendSmsBatchResult {
+  batch_id: string;
+  data: SendSmsResult[];
+}
+
+export interface SmsMessage {
+  id: string;
+  status: string;
+  to: string;
+  body: string;
+  segments: number;
+  sender_id: string | null;
+  provider_id: string | null;
+  provider_message_id: string | null;
+  attempts: number;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  last_error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SmsEvent {
+  id: string;
+  type: string;
+  occurredAt: string;
+  [key: string]: unknown;
+}
+
+export interface ListSmsOptions {
+  limit?: number;
+  cursor?: string;
+  status?: SmsStatus;
 }
 
 export type KnownWebhookEvent =
@@ -348,6 +451,7 @@ export interface SendstackRawRequestOptions extends SendstackRequestOptions {
 export interface SendstackClientOptions {
   baseUrl?: string;
   token?: string;
+  senderId?: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
   headers?: HeadersInit;

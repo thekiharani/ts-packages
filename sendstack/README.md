@@ -1,14 +1,14 @@
 # `@norialabs/sendstack`
 
-Official JavaScript SDK for the SendStack email SaaS API.
+Official JavaScript SDK for the SendStack messaging API.
 
 Use it for:
 
-- transactional and scheduled email
-- batch email
+- transactional and scheduled email and SMS
+- batch email and SMS
 - reusable attachment uploads
 - sending domains
-- email templates
+- email and SMS templates (with rendered previews)
 - webhook endpoints and webhook event retries
 - suppression lists
 
@@ -103,6 +103,13 @@ const sendstack = new Sendstack({
 | `emails.events(messageId, options?)` | `GET /emails/{id}/events` | `CursorPage<EmailEvent>` |
 | `emails.cancel(messageId, options?)` | `POST /emails/{id}/cancel` | `EmailMessage` |
 | `emails.requeue(messageId, options?)` | `POST /emails/{id}/requeue` | `EmailMessage` |
+| `sms.send(payload, options?)` | `POST /sms` | `SendSmsResult` |
+| `sms.sendBatch(payload, options?)` | `POST /sms/batch` | `SendSmsBatchResult` |
+| `sms.list(options?)` | `GET /sms` | `CursorPage<SmsMessage>` |
+| `sms.get(messageId, options?)` | `GET /sms/{id}` | `SmsMessage` |
+| `sms.events(messageId, options?)` | `GET /sms/{id}/events` | `CursorPage<SmsEvent>` |
+| `sms.cancel(messageId, options?)` | `POST /sms/{id}/cancel` | `SmsMessage` |
+| `sms.requeue(messageId, options?)` | `POST /sms/{id}/requeue` | `SmsMessage` |
 | `domains.create(payload, options?)` | `POST /domains` | `Domain` |
 | `domains.list(options?)` | `GET /domains` | `CursorPage<Domain>` |
 | `domains.get(domainId, options?)` | `GET /domains/{id}` | `Domain` |
@@ -112,6 +119,7 @@ const sendstack = new Sendstack({
 | `templates.get(templateId, options?)` | `GET /templates/{id}` | `EmailTemplate` |
 | `templates.update(templateId, payload, options?)` | `PATCH /templates/{id}` | `EmailTemplate` |
 | `templates.remove(templateId, options?)` | `DELETE /templates/{id}` | `void` |
+| `templates.preview(payload, options?)` | `POST /templates/preview` | `TemplatePreview` |
 | `webhooks.create(payload, options?)` | `POST /webhook-endpoints` | `WebhookEndpoint` |
 | `webhooks.list(options?)` | `GET /webhook-endpoints` | `CursorPage<WebhookEndpoint>` |
 | `webhooks.update(webhookId, payload, options?)` | `PATCH /webhook-endpoints/{id}` | `WebhookEndpoint` |
@@ -158,6 +166,39 @@ await sendstack.emails.sendBatch([
 ```
 
 The SDK accepts TypeScript-friendly aliases like `replyTo`, `trackOpens`, `trackClicks`, `providerId`, `templateId`, `templateData`, and `scheduledAt`, then sends the snake-case API fields.
+
+## SMS
+
+SMS sends from a registered sender ID. Set a default `senderId` once on the client and every `sms.send` / `sms.sendBatch` call uses it unless that call passes its own `senderId` (or `sender_id`) to override:
+
+```ts
+const sendstack = new Sendstack({ token, senderId: "NORIA" });
+
+// Uses the client default sender ("NORIA").
+await sendstack.sms.send({
+  to: "+254700000000",
+  body: "Your code is {{ code }}",
+  templateData: { code: "1234" },
+});
+
+// Overrides the default for this one message.
+await sendstack.sms.send({
+  to: "+254700000001",
+  body: "Reminder: your appointment is tomorrow.",
+  senderId: "CLINIC",
+});
+```
+
+Batch sends accept either an array or `{ messages: [...] }`, and the default sender is applied per message:
+
+```ts
+await sendstack.sms.sendBatch([
+  { to: "+254700000002", body: "First" },
+  { to: "+254700000003", body: "Second", senderId: "ALERTS" },
+]);
+```
+
+`sms.list`, `sms.get`, `sms.events`, `sms.cancel`, and `sms.requeue` mirror their `emails.*` counterparts. SMS responses include a `segments` count — billing is one credit per segment. The SMS request accepts the same TypeScript-friendly aliases (`senderId`, `providerId`, `templateId`, `templateData`, `scheduledAt`).
 
 ## Attachments
 
@@ -236,6 +277,8 @@ await sendstack.domains.verify(domain.id);
 
 ## Templates
 
+Templates are channel-aware: pass `channel: "email"` (the default) or `channel: "sms"`. Email templates use `subject`/`html`/`text`; SMS templates use `body`. Filter the list with `templates.list({ channel })`.
+
 ```ts
 const template = await sendstack.templates.create({
   name: "Welcome",
@@ -253,6 +296,23 @@ await sendstack.emails.send({
     variables: { firstName: "Amina" },
   },
 });
+```
+
+Render any template against sample data with `templates.preview` before sending — for SMS the preview returns the `segments` count so you can check cost up front:
+
+```ts
+const otp = await sendstack.templates.create({
+  channel: "sms",
+  name: "otp",
+  body: "Your code is {{ code }}",
+  sampleData: { code: "1234" },
+});
+
+const preview = await sendstack.templates.preview({
+  templateId: otp.id,
+  data: { code: "4821" },
+});
+// { channel: "sms", body: "Your code is 4821", segments: 1, variables: ["code"], ... }
 ```
 
 ## Webhooks
@@ -380,6 +440,12 @@ Important type exports:
 - `SendEmailBatchResult`
 - `EmailMessage`
 - `EmailEvent`
+- `SendSmsRequest`
+- `SendSmsResult`
+- `SendSmsBatchRequest`
+- `SendSmsBatchResult`
+- `SmsMessage`
+- `SmsEvent`
 - `UploadAttachmentRequest`
 - `UploadedAttachment`
 - `CreateDomainRequest`
@@ -387,6 +453,9 @@ Important type exports:
 - `CreateTemplateRequest`
 - `UpdateTemplateRequest`
 - `EmailTemplate`
+- `PreviewTemplateRequest`
+- `TemplatePreview`
+- `TemplateVariable`
 - `CreateWebhookEndpointRequest`
 - `UpdateWebhookEndpointRequest`
 - `WebhookEndpoint`
