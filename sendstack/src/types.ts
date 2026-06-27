@@ -1,4 +1,4 @@
-export const DEFAULT_BASE_URL = "https://mailer.norialabs.com";
+export const DEFAULT_BASE_URL = "https://sendstack.norialabs.com/api/v1";
 
 export type Recipient = string | string[];
 export type SendstackQueryValue = string | number | boolean | Date | undefined;

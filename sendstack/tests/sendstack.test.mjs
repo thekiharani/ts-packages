@@ -127,11 +127,11 @@ function suppression(overrides = {}) {
 }
 
 test("exports Sendstack-first names", () => {
-  assert.equal(DEFAULT_BASE_URL, "https://mailer.norialabs.com");
+  assert.equal(DEFAULT_BASE_URL, "https://sendstack.norialabs.com/api/v1");
   assert.equal(SendstackClient, Sendstack);
 
   const defaultClient = new Sendstack("mlr_live_123");
-  assert.equal(defaultClient.baseUrl, "https://mailer.norialabs.com");
+  assert.equal(defaultClient.baseUrl, "https://sendstack.norialabs.com/api/v1");
   assert.equal(defaultClient.token, "mlr_live_123");
 
   const optionsClient = new Sendstack({
