@@ -49,12 +49,12 @@ const message = await sendstack.emails.send(
 console.log(message.id, message.status);
 ```
 
-The SDK defaults to `https://mailer.norialabs.com`, matching the current live API. Override it when you move to the SendStack domain:
+The SDK defaults to `https://sendstack.norialabs.com/api/v1` (the versioned API base). Override `baseUrl` to point at another environment — include the `/api/v1` version segment, since the SDK sends resource paths (e.g. `/emails`) relative to whatever base you provide:
 
 ```ts
 const sendstack = new Sendstack({
   token,
-  baseUrl: "https://sendstack.norialabs.com",
+  baseUrl: "https://staging.norialabs.com/api/v1",
 });
 ```
 
