@@ -53,7 +53,7 @@ The SDK defaults to `https://sendstack.norialabs.com/api/v1` (the versioned API 
 
 ```ts
 const sendstack = new Sendstack({
-  token,
+  authToken,
   baseUrl: "https://staging.norialabs.com/api/v1",
 });
 ```
@@ -167,14 +167,40 @@ await sendstack.emails.sendBatch([
 
 The SDK accepts TypeScript-friendly aliases like `replyTo`, `trackOpens`, `trackClicks`, `providerId`, `templateId`, `templateData`, and `scheduledAt`, then sends the snake-case API fields.
 
-## SMS
+## Per-channel defaults
 
-SMS sends from a registered sender ID. Set a default `senderId` once on the client and every `sms.send` / `sms.sendBatch` call uses it unless that call passes its own `senderId` (or `sender_id`) to override:
+`from` (email) and `senderId` (SMS) are usually constant, so set them once on the client. Each send fills the default in when the call omits it, and any per-send value overrides it:
 
 ```ts
-const sendstack = new Sendstack({ token, senderId: "NORIA" });
+const sendstack = new Sendstack({
+  authToken: "mlr_live_…",
+  emails: { from: "Noria <hello@example.com>" },
+  sms: { senderId: "NORIA" },
+});
 
-// Uses the client default sender ("NORIA").
+await sendstack.emails.send({ to: "customer@example.com", subject: "Welcome", html: "<p>Hi</p>" }); // from applied
+await sendstack.sms.send({ to: "+254700000000", body: "Your code is 4821" });                       // senderId applied
+```
+
+The channel namespaces are bound methods, so you can destructure them for a terser call-site:
+
+```ts
+const { emails, sms } = new Sendstack({
+  authToken: "mlr_live_…",
+  emails: { from: "Noria <hello@example.com>" },
+  sms: { senderId: "NORIA" },
+});
+
+await emails.send({ to: "customer@example.com", subject: "Welcome", html: "<p>Hi</p>" });
+await sms.send({ to: "+254700000000", body: "Your code is 4821" });
+```
+
+## SMS
+
+With `sms: { senderId }` set on the client (above), a send only needs `to` and `body`; pass `senderId` on the call to override for one message:
+
+```ts
+// Uses the client default sender.
 await sendstack.sms.send({
   to: "+254700000000",
   body: "Your code is {{ code }}",
@@ -428,6 +454,8 @@ Runtime exports:
 Important type exports:
 
 - `SendstackClientOptions`
+- `EmailDefaults`
+- `SmsDefaults`
 - `SendstackRequestOptions`
 - `SendstackMutationOptions`
 - `SendstackRawRequestOptions`
