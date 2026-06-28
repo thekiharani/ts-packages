@@ -7,6 +7,7 @@ import type {
   CreateWebhookEndpointRequest,
   CursorPage,
   Domain,
+  EmailDefaults,
   EmailEvent,
   EmailMessage,
   EmailTemplate,
@@ -23,6 +24,7 @@ import type {
   SendSmsBatchResult,
   SendSmsRequest,
   SendSmsResult,
+  SmsDefaults,
   SmsMessage,
   SmsEvent,
   TemplatePreview,
@@ -65,6 +67,7 @@ export type {
   DomainRegion,
   DomainTlsPolicy,
   EmailAttachmentInput,
+  EmailDefaults,
   EmailEvent,
   EmailMessage,
   EmailStatus,
@@ -85,6 +88,7 @@ export type {
   SendSmsBatchResult,
   SendSmsRequest,
   SendSmsResult,
+  SmsDefaults,
   SmsEvent,
   SmsMessage,
   SmsStatus,
@@ -127,8 +131,9 @@ interface NormalizedRetryPolicy {
 }
 
 export class Sendstack {
-  readonly token: string;
-  readonly senderId: string | undefined;
+  readonly authToken: string;
+  readonly emailFrom: string | undefined;
+  readonly smsSenderId: string | undefined;
   readonly baseUrl: string;
   readonly timeoutMs: number;
   readonly attachments: {
@@ -233,23 +238,23 @@ export class Sendstack {
   readonly #transformResponse: SendstackResponseTransformer;
 
   constructor(options?: SendstackClientOptions);
-  constructor(token: string, options?: SendstackClientOptions);
+  constructor(authToken: string, options?: SendstackClientOptions);
   constructor(
-    tokenOrOptions: string | SendstackClientOptions = {},
+    authTokenOrOptions: string | SendstackClientOptions = {},
     maybeOptions?: SendstackClientOptions,
   ) {
-    const options = typeof tokenOrOptions === "string" ? maybeOptions ?? {} : tokenOrOptions;
-    const token = typeof tokenOrOptions === "string" ? tokenOrOptions : options.token ?? "";
+    const options = typeof authTokenOrOptions === "string" ? maybeOptions ?? {} : authTokenOrOptions;
+    const authToken = typeof authTokenOrOptions === "string" ? authTokenOrOptions : options.authToken ?? "";
 
     if (typeof fetch !== "function" && !options.fetch) {
       throw new TypeError("A fetch implementation is required in this runtime.");
     }
 
-    const normalizedToken = token.trim();
-    const normalizedSenderId = (options.senderId ?? "").trim();
+    const normalizedToken = authToken.trim();
 
-    this.token = normalizedToken;
-    this.senderId = normalizedSenderId === "" ? undefined : normalizedSenderId;
+    this.authToken = normalizedToken;
+    this.emailFrom = normalizeDefault(options.emails?.from);
+    this.smsSenderId = normalizeDefault(options.sms?.senderId);
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.#fetch = options.fetch ?? fetch;
@@ -281,13 +286,13 @@ export class Sendstack {
       send: (request, requestOptions) =>
         this.request("POST", "/emails", {
           ...requestOptions,
-          body: normalizeSendEmailRequest(request),
+          body: normalizeSendEmailRequest(request, this.emailFrom),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
       sendBatch: (request, requestOptions) =>
         this.request("POST", "/emails/batch", {
           ...requestOptions,
-          body: normalizeSendEmailBatchRequest(request),
+          body: normalizeSendEmailBatchRequest(request, this.emailFrom),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
       list: (requestOptions) =>
@@ -367,13 +372,13 @@ export class Sendstack {
       send: (request, requestOptions) =>
         this.request("POST", "/sms", {
           ...requestOptions,
-          body: normalizeSendSmsRequest(request, this.senderId),
+          body: normalizeSendSmsRequest(request, this.smsSenderId),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
       sendBatch: (request, requestOptions) =>
         this.request("POST", "/sms/batch", {
           ...requestOptions,
-          body: normalizeSendSmsBatchRequest(request, this.senderId),
+          body: normalizeSendSmsBatchRequest(request, this.smsSenderId),
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
       list: (requestOptions) =>
@@ -643,17 +648,28 @@ function normalizeUploadAttachmentRequest(request: UploadAttachmentRequest): Rec
   return payload;
 }
 
-function normalizeSendEmailBatchRequest(request: SendEmailBatchRequest): Record<string, unknown> | Array<Record<string, unknown>> {
+function normalizeDefault(value: string | undefined): string | undefined {
+  const trimmed = (value ?? "").trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+function normalizeSendEmailBatchRequest(
+  request: SendEmailBatchRequest,
+  defaultFrom: string | undefined,
+): Record<string, unknown> | Array<Record<string, unknown>> {
   if (Array.isArray(request)) {
-    return request.map((email) => normalizeSendEmailRequest(email));
+    return request.map((email) => normalizeSendEmailRequest(email, defaultFrom));
   }
 
   return {
-    emails: request.emails.map((email) => normalizeSendEmailRequest(email)),
+    emails: request.emails.map((email) => normalizeSendEmailRequest(email, defaultFrom)),
   };
 }
 
-function normalizeSendEmailRequest(request: SendEmailRequest): Record<string, unknown> {
+function normalizeSendEmailRequest(
+  request: SendEmailRequest,
+  defaultFrom: string | undefined,
+): Record<string, unknown> {
   const payload = { ...request } as Record<string, unknown>;
   renameAlias(payload, "replyTo", "reply_to");
   renameAlias(payload, "trackOpens", "track_opens");
@@ -665,6 +681,10 @@ function normalizeSendEmailRequest(request: SendEmailRequest): Record<string, un
 
   if (payload["scheduled_at"] instanceof Date) {
     payload["scheduled_at"] = payload["scheduled_at"].toISOString();
+  }
+
+  if (defaultFrom !== undefined && payload["from"] === undefined) {
+    payload["from"] = defaultFrom;
   }
 
   const attachments = payload["attachments"];
