@@ -58,7 +58,7 @@ export interface TemplateReference {
 }
 
 export interface SendEmailRequest {
-  from: string;
+  from?: string;
   to: Recipient;
   cc?: Recipient;
   bcc?: Recipient;
@@ -448,10 +448,21 @@ export interface SendstackRawRequestOptions extends SendstackRequestOptions {
   idempotencyKey?: string;
 }
 
+export interface EmailDefaults {
+  /** Default `from` applied to every email send when the call omits one. */
+  from?: string;
+}
+
+export interface SmsDefaults {
+  /** Default sender id applied to every SMS send when the call omits one. */
+  senderId?: string;
+}
+
 export interface SendstackClientOptions {
   baseUrl?: string;
-  token?: string;
-  senderId?: string;
+  authToken?: string;
+  emails?: EmailDefaults;
+  sms?: SmsDefaults;
   fetch?: typeof fetch;
   timeoutMs?: number;
   headers?: HeadersInit;

@@ -152,14 +152,14 @@ test("exports Sendstack-first names", () => {
 
   const defaultClient = new Sendstack("mlr_live_123");
   assert.equal(defaultClient.baseUrl, "https://sendstack.norialabs.com/api/v1");
-  assert.equal(defaultClient.token, "mlr_live_123");
+  assert.equal(defaultClient.authToken, "mlr_live_123");
 
   const optionsClient = new Sendstack({
-    token: "mlr_live_options",
+    authToken: "mlr_live_options",
     baseUrl: "https://sendstack.norialabs.com/",
   });
   assert.equal(optionsClient.baseUrl, "https://sendstack.norialabs.com");
-  assert.equal(optionsClient.token, "mlr_live_options");
+  assert.equal(optionsClient.authToken, "mlr_live_options");
 });
 
 test("emails.send uses bearer auth and normalizes SendStack payload aliases", async () => {
@@ -541,7 +541,7 @@ test("all OpenAPI resource methods hit the expected SendStack endpoints", async 
 test("sms.* endpoints normalize aliases and apply the client sender_id with per-send override", async () => {
   const client = new Sendstack("mlr_live_123", {
     baseUrl: "https://mailer.norialabs.com/api",
-    senderId: "NORIA",
+    sms: { senderId: "NORIA" },
     fetch: createSequenceFetch([
       {
         assert: (input, init) => {
@@ -637,7 +637,7 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
     ]),
   });
 
-  assert.equal(client.senderId, "NORIA");
+  assert.equal(client.smsSenderId, "NORIA");
   assert.equal((await client.sms.send({
     to: "+254700000000",
     body: "Your code is 1234",
@@ -719,7 +719,7 @@ test("sms.send without a client sender_id omits it; templates support preview, c
     ]),
   });
 
-  assert.equal(client.senderId, undefined);
+  assert.equal(client.smsSenderId, undefined);
   assert.equal((await client.sms.send({ to: "+254700000000", body: "Hi" })).id, "sms_1");
   assert.equal((await client.templates.preview({
     templateId: "tpl_otp",
@@ -732,6 +732,52 @@ test("sms.send without a client sender_id omits it; templates support preview, c
     sampleData: { code: "1234" },
   })).id, "tpl_1");
   assert.equal((await client.templates.list({ channel: "sms" })).data[0].id, "tpl_1");
+});
+
+test("emails.send/sendBatch apply the client default from with per-send override", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    emails: { from: "Noria <hello@example.com>" },
+    fetch: createSequenceFetch([
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/emails");
+          assert.deepEqual(JSON.parse(init.body), {
+            from: "Noria <hello@example.com>",
+            to: "friend@example.com",
+            subject: "Hi",
+            text: "Hello",
+          });
+        },
+        response: createJsonResponse(email(), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/emails");
+          assert.equal(JSON.parse(init.body).from, "billing@example.com");
+        },
+        response: createJsonResponse(email(), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/emails/batch");
+          assert.deepEqual(JSON.parse(init.body), [
+            { from: "Noria <hello@example.com>", to: "a@example.com", text: "One" },
+            { from: "ops@example.com", to: "b@example.com", text: "Two" },
+          ]);
+        },
+        response: createJsonResponse({ batch_id: "batch_1", data: [] }, { status: 202 }),
+      },
+    ]),
+  });
+
+  assert.equal(client.emailFrom, "Noria <hello@example.com>");
+  assert.equal((await client.emails.send({ to: "friend@example.com", subject: "Hi", text: "Hello" })).id, "msg_1");
+  assert.equal((await client.emails.send({ from: "billing@example.com", to: "friend@example.com", subject: "Hi", text: "Hi" })).id, "msg_1");
+  assert.equal((await client.emails.sendBatch([
+    { to: "a@example.com", text: "One" },
+    { from: "ops@example.com", to: "b@example.com", text: "Two" },
+  ])).batch_id, "batch_1");
 });
 
 test("raw request supports middleware, custom auth, query serialization, native bodies, and transforms", async () => {
