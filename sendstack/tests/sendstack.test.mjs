@@ -541,7 +541,7 @@ test("all OpenAPI resource methods hit the expected SendStack endpoints", async 
 test("sms.* endpoints normalize aliases and apply the client sender_id with per-send override", async () => {
   const client = new Sendstack("mlr_live_123", {
     baseUrl: "https://mailer.norialabs.com/api",
-    sms: { senderId: "NORIA" },
+    sms: { from: "NORIA" },
     fetch: createSequenceFetch([
       {
         assert: (input, init) => {
@@ -550,7 +550,7 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
           assert.deepEqual(JSON.parse(init.body), {
             to: "+254700000000",
             body: "Your code is 1234",
-            sender_id: "NORIA",
+            from: "NORIA",
             provider_id: "prov_1",
             template_id: "tpl_otp",
             template_data: { code: "1234" },
@@ -565,7 +565,7 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
           assert.deepEqual(JSON.parse(init.body), {
             to: "+254700000001",
             body: "Hi",
-            sender_id: "OTHER",
+            from: "OTHER",
           });
         },
         response: createJsonResponse(sms({ sender_id: "OTHER" }), { status: 202 }),
@@ -575,8 +575,8 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
           assert.equal(String(input), "https://mailer.norialabs.com/api/sms/batch");
           assert.deepEqual(JSON.parse(init.body), {
             messages: [
-              { to: "+254700000002", body: "One", sender_id: "NORIA" },
-              { to: "+254700000003", body: "Two", sender_id: "KEEP" },
+              { to: "+254700000002", body: "One", from: "NORIA" },
+              { to: "+254700000003", body: "Two", from: "KEEP" },
             ],
           });
         },
@@ -589,7 +589,7 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
         assert: (input, init) => {
           assert.equal(String(input), "https://mailer.norialabs.com/api/sms/batch");
           assert.deepEqual(JSON.parse(init.body), [
-            { to: "+254700000004", body: "Solo", sender_id: "NORIA" },
+            { to: "+254700000004", body: "Solo", from: "NORIA" },
           ]);
         },
         response: createJsonResponse({
@@ -649,12 +649,12 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
   assert.equal((await client.sms.send({
     to: "+254700000001",
     body: "Hi",
-    senderId: "OTHER",
+    from: "OTHER",
   })).sender_id, "OTHER");
   assert.equal((await client.sms.sendBatch({
     messages: [
       { to: "+254700000002", body: "One" },
-      { to: "+254700000003", body: "Two", senderId: "KEEP" },
+      { to: "+254700000003", body: "Two", from: "KEEP" },
     ],
   })).batch_id, "smsbatch_1");
   assert.equal((await client.sms.sendBatch([

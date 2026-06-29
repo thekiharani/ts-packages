@@ -233,8 +233,7 @@ export interface EmailTemplate {
 export interface SendSmsRequest {
   to: string;
   body?: string;
-  senderId?: string;
-  sender_id?: string;
+  from?: string;
   providerId?: string;
   provider_id?: string;
   metadata?: Record<string, string>;
@@ -266,6 +265,7 @@ export interface SmsMessage {
   to: string;
   body: string;
   segments: number;
+  sender: string | null;
   sender_id: string | null;
   provider_id: string | null;
   provider_message_id: string | null;
@@ -455,7 +455,7 @@ export interface EmailDefaults {
 
 export interface SmsDefaults {
   /** Default sender id applied to every SMS send when the call omits one. */
-  senderId?: string;
+  from?: string;
 }
 
 export interface SendstackClientOptions {

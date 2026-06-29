@@ -254,7 +254,7 @@ export class Sendstack {
 
     this.authToken = normalizedToken;
     this.emailFrom = normalizeDefault(options.emails?.from);
-    this.smsSenderId = normalizeDefault(options.sms?.senderId);
+    this.smsSenderId = normalizeDefault(options.sms?.from);
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.#fetch = options.fetch ?? fetch;
@@ -752,7 +752,6 @@ function normalizeSendSmsRequest(
   defaultSenderId: string | undefined,
 ): Record<string, unknown> {
   const payload = { ...request } as Record<string, unknown>;
-  renameAlias(payload, "senderId", "sender_id");
   renameAlias(payload, "providerId", "provider_id");
   renameAlias(payload, "templateId", "template_id");
   renameAlias(payload, "templateData", "template_data");
@@ -762,8 +761,8 @@ function normalizeSendSmsRequest(
     payload["scheduled_at"] = payload["scheduled_at"].toISOString();
   }
 
-  if (defaultSenderId !== undefined && payload["sender_id"] === undefined) {
-    payload["sender_id"] = defaultSenderId;
+  if (defaultSenderId !== undefined && payload["from"] === undefined) {
+    payload["from"] = defaultSenderId;
   }
 
   return payload;
