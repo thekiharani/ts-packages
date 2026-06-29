@@ -169,17 +169,17 @@ The SDK accepts TypeScript-friendly aliases like `replyTo`, `trackOpens`, `track
 
 ## Per-channel defaults
 
-`from` (email) and `senderId` (SMS) are usually constant, so set them once on the client. Each send fills the default in when the call omits it, and any per-send value overrides it:
+`from` (email) and `from` (SMS) are usually constant, so set them once on the client. Each send fills the default in when the call omits it, and any per-send value overrides it:
 
 ```ts
 const sendstack = new Sendstack({
   authToken: "mlr_live_…",
   emails: { from: "Noria <hello@example.com>" },
-  sms: { senderId: "NORIA" },
+  sms: { from: "NORIA" },
 });
 
 await sendstack.emails.send({ to: "customer@example.com", subject: "Welcome", html: "<p>Hi</p>" }); // from applied
-await sendstack.sms.send({ to: "+254700000000", body: "Your code is 4821" });                       // senderId applied
+await sendstack.sms.send({ to: "+254700000000", body: "Your code is 4821" });                       // from applied
 ```
 
 The channel namespaces are bound methods, so you can destructure them for a terser call-site:
@@ -188,7 +188,7 @@ The channel namespaces are bound methods, so you can destructure them for a ters
 const { emails, sms } = new Sendstack({
   authToken: "mlr_live_…",
   emails: { from: "Noria <hello@example.com>" },
-  sms: { senderId: "NORIA" },
+  sms: { from: "NORIA" },
 });
 
 await emails.send({ to: "customer@example.com", subject: "Welcome", html: "<p>Hi</p>" });
@@ -197,7 +197,7 @@ await sms.send({ to: "+254700000000", body: "Your code is 4821" });
 
 ## SMS
 
-With `sms: { senderId }` set on the client (above), a send only needs `to` and `body`; pass `senderId` on the call to override for one message:
+With `sms: { from }` set on the client (above), a send only needs `to` and `body`; pass `from` on the call to override for one message:
 
 ```ts
 // Uses the client default sender.
@@ -211,7 +211,7 @@ await sendstack.sms.send({
 await sendstack.sms.send({
   to: "+254700000001",
   body: "Reminder: your appointment is tomorrow.",
-  senderId: "CLINIC",
+  from: "CLINIC",
 });
 ```
 
@@ -220,11 +220,11 @@ Batch sends accept either an array or `{ messages: [...] }`, and the default sen
 ```ts
 await sendstack.sms.sendBatch([
   { to: "+254700000002", body: "First" },
-  { to: "+254700000003", body: "Second", senderId: "ALERTS" },
+  { to: "+254700000003", body: "Second", from: "ALERTS" },
 ]);
 ```
 
-`sms.list`, `sms.get`, `sms.events`, `sms.cancel`, and `sms.requeue` mirror their `emails.*` counterparts. SMS responses include a `segments` count — billing is one credit per segment. The SMS request accepts the same TypeScript-friendly aliases (`senderId`, `providerId`, `templateId`, `templateData`, `scheduledAt`).
+`sms.list`, `sms.get`, `sms.events`, `sms.cancel`, and `sms.requeue` mirror their `emails.*` counterparts. SMS responses include a `segments` count — billing is one credit per segment. The SMS request accepts the same TypeScript-friendly aliases (`providerId`, `templateId`, `templateData`, `scheduledAt`).
 
 ## Attachments
 
