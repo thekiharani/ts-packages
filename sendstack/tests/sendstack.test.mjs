@@ -1113,3 +1113,33 @@ test("request validates base URLs, timeout behavior, abort behavior, and non-jso
     body: new URLSearchParams([["hello", "world"]]),
   }), { ok: true });
 });
+
+test("templates.create(...).publish() creates then publishes in one chain", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    fetch: createSequenceFetch([
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse({ id: "tpl_1", object: "template" }, { status: 201 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates/tpl_1/publish");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse(template({ status: "published" })),
+      },
+    ]),
+  });
+
+  const publishable = client.templates.create({ name: "Welcome", subject: "Welcome", html: "<p>Hello</p>" });
+  const created = await publishable;
+  assert.equal(created.id, "tpl_1");
+
+  const published = await publishable.publish();
+  assert.equal(published.status, "published");
+  assert.equal(published.id, "tpl_1");
+});
