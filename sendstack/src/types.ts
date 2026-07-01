@@ -262,6 +262,13 @@ export interface EmailTemplate {
   [key: string]: unknown;
 }
 
+/** Result of `templates.create(...)`: awaitable to the created template, and chainable
+ *  with `.publish()` to create then publish in one expression -
+ *  `await client.templates.create({...}).publish()`. */
+export interface PublishableTemplate extends Promise<EmailTemplate> {
+  publish(options?: SendstackMutationOptions): Promise<EmailTemplate>;
+}
+
 export interface SendSmsRequest {
   to: string;
   body?: string;

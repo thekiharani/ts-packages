@@ -330,6 +330,14 @@ await sendstack.templates.publish(template.id);
 const copy = await sendstack.templates.duplicate(template.id, { name: "Welcome v2" });
 ```
 
+`templates.create(...)` is awaitable **and** chainable — `.publish()` creates then publishes in one expression (an alternative to the `publish: true` flag above):
+
+```ts
+const published = await sendstack.templates
+  .create({ name: "order-confirmation", subject: "Order", html: "<p>Thanks</p>" })
+  .publish();
+```
+
 Render any template against sample data with `templates.preview` before sending — for SMS the preview returns the `segments` count so you can check cost up front:
 
 ```ts

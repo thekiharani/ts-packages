@@ -16,6 +16,7 @@ import type {
   ListSmsOptions,
   ListTemplatesOptions,
   PreviewTemplateRequest,
+  PublishableTemplate,
   RetryWebhookEventResult,
   SendEmailBatchRequest,
   SendEmailBatchResult,
@@ -80,6 +81,7 @@ export type {
   ListSmsOptions,
   ListTemplatesOptions,
   PreviewTemplateRequest,
+  PublishableTemplate,
   Recipient,
   RetryWebhookEventResult,
   SendEmailBatchRequest,
@@ -173,7 +175,7 @@ export class Sendstack {
     create: <TRequest extends CreateTemplateRequest>(
       request: TRequest,
       options?: SendstackMutationOptions,
-    ) => Promise<EmailTemplate>;
+    ) => PublishableTemplate;
     list: (options?: ListTemplatesOptions & SendstackRequestOptions) => Promise<CursorPage<EmailTemplate>>;
     get: (id: string, options?: SendstackRequestOptions) => Promise<EmailTemplate>;
     update: <TRequest extends UpdateTemplateRequest>(
@@ -342,12 +344,17 @@ export class Sendstack {
     };
 
     this.templates = {
-      create: (request, requestOptions) =>
-        this.request("POST", "/templates", {
+      create: (request, requestOptions) => {
+        const created = this.request<EmailTemplate>("POST", "/templates", {
           ...requestOptions,
           body: normalizeTemplateRequest(request),
           idempotencyKey: requestOptions?.idempotencyKey,
-        }),
+        });
+        const publishable = created as PublishableTemplate;
+        publishable.publish = (publishOptions) =>
+          created.then((template) => this.templates.publish(template.id, publishOptions));
+        return publishable;
+      },
       list: (requestOptions) =>
         this.request("GET", "/templates", {
           ...requestOptions,
