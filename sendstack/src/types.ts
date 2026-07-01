@@ -52,11 +52,6 @@ export interface UploadedAttachment {
   content_type: string | null;
 }
 
-export interface TemplateReference {
-  id: string;
-  variables?: Record<string, unknown>;
-}
-
 export interface SendEmailRequest {
   from?: string;
   to: Recipient;
@@ -81,7 +76,6 @@ export interface SendEmailRequest {
   template_id?: string;
   templateData?: Record<string, unknown>;
   template_data?: Record<string, unknown>;
-  template?: TemplateReference;
   scheduledAt?: string | Date;
   scheduled_at?: string | Date;
 }
@@ -166,9 +160,16 @@ export interface Domain {
 
 export interface TemplateVariable {
   name: string;
+  type?: "string" | "number" | "boolean";
   required?: boolean;
+  /** Used at send time when the variable is absent; a required variable with no fallback fails 422. */
+  fallback_value?: string | number | boolean;
   description?: string;
   example?: string;
+}
+
+export interface DuplicateTemplateRequest {
+  name?: string;
 }
 
 export interface CreateTemplateRequest {
@@ -182,6 +183,17 @@ export interface CreateTemplateRequest {
   variables?: TemplateVariable[];
   sampleData?: Record<string, unknown>;
   sample_data?: Record<string, unknown>;
+  from?: string;
+  fromName?: string;
+  from_name?: string;
+  replyTo?: string;
+  reply_to?: string;
+  preheader?: string;
+  category?: string;
+  description?: string;
+  tags?: string[];
+  /** Create and publish in one call; otherwise the template starts as a draft. */
+  publish?: boolean;
 }
 
 export interface UpdateTemplateRequest {
@@ -192,6 +204,15 @@ export interface UpdateTemplateRequest {
   variables?: TemplateVariable[];
   sampleData?: Record<string, unknown>;
   sample_data?: Record<string, unknown>;
+  from?: string;
+  fromName?: string;
+  from_name?: string;
+  replyTo?: string;
+  reply_to?: string;
+  preheader?: string;
+  category?: string;
+  description?: string;
+  tags?: string[];
 }
 
 export interface PreviewTemplateRequest {
@@ -202,7 +223,8 @@ export interface PreviewTemplateRequest {
   html?: string;
   text?: string;
   body?: string;
-  data?: Record<string, unknown>;
+  templateData?: Record<string, unknown>;
+  template_data?: Record<string, unknown>;
 }
 
 export interface TemplatePreview {
@@ -217,16 +239,26 @@ export interface TemplatePreview {
 
 export interface ListTemplatesOptions {
   channel?: TemplateChannel;
+  status?: "draft" | "published";
+  limit?: number;
+  cursor?: string;
 }
 
 export interface EmailTemplate {
   id: string;
   tenantId: string;
+  channel: string;
   name: string;
-  subject: string;
+  slug: string | null;
+  subject: string | null;
   htmlBody: string | null;
   textBody: string | null;
+  status: string;
+  version: number;
+  variables: TemplateVariable[];
+  publishedAt: string | null;
   createdAt: string;
+  updatedAt: string;
   [key: string]: unknown;
 }
 
