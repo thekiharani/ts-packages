@@ -7,6 +7,7 @@ import type {
   CreateWebhookEndpointRequest,
   CursorPage,
   Domain,
+  DuplicateTemplateRequest,
   EmailDefaults,
   EmailEvent,
   EmailMessage,
@@ -65,6 +66,7 @@ export type {
   Domain,
   DomainCapability,
   DomainRegion,
+  DuplicateTemplateRequest,
   DomainTlsPolicy,
   EmailAttachmentInput,
   EmailDefaults,
@@ -115,7 +117,6 @@ export type {
   SuccessEnvelope,
   Suppression,
   SuppressionReason,
-  TemplateReference,
   UpdateTemplateRequest,
   UpdateWebhookEndpointRequest,
   UploadAttachmentRequest,
@@ -181,6 +182,12 @@ export class Sendstack {
       options?: SendstackMutationOptions,
     ) => Promise<EmailTemplate>;
     remove: (id: string, options?: SendstackMutationOptions) => Promise<void>;
+    publish: (id: string, options?: SendstackMutationOptions) => Promise<EmailTemplate>;
+    duplicate: (
+      id: string,
+      request?: DuplicateTemplateRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<EmailTemplate>;
     preview: <TRequest extends PreviewTemplateRequest>(
       request: TRequest,
       options?: SendstackMutationOptions,
@@ -360,6 +367,17 @@ export class Sendstack {
           idempotencyKey: requestOptions?.idempotencyKey,
         });
       },
+      publish: (id, requestOptions) =>
+        this.request("POST", `/templates/${encodeURIComponent(id)}/publish`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      duplicate: (id, request, requestOptions) =>
+        this.request("POST", `/templates/${encodeURIComponent(id)}/duplicate`, {
+          ...requestOptions,
+          body: request ?? {},
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
       preview: (request, requestOptions) =>
         this.request("POST", "/templates/preview", {
           ...requestOptions,
@@ -725,12 +743,15 @@ function normalizeTemplateRequest(
 ): Record<string, unknown> {
   const payload = { ...request } as Record<string, unknown>;
   renameAlias(payload, "sampleData", "sample_data");
+  renameAlias(payload, "fromName", "from_name");
+  renameAlias(payload, "replyTo", "reply_to");
   return payload;
 }
 
 function normalizeTemplatePreviewRequest(request: PreviewTemplateRequest): Record<string, unknown> {
   const payload = { ...request } as Record<string, unknown>;
   renameAlias(payload, "templateId", "template_id");
+  renameAlias(payload, "templateData", "template_data");
   return payload;
 }
 
@@ -866,6 +887,9 @@ function mergeTemplateListQuery(
   return mergeQueryParams(
     {
       channel: options?.channel,
+      status: options?.status,
+      limit: options?.limit,
+      cursor: options?.cursor,
     },
     options?.query,
   );
