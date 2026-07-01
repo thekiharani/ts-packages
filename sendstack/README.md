@@ -303,7 +303,9 @@ await sendstack.domains.verify(domain.id);
 
 ## Templates
 
-Templates are channel-aware: pass `channel: "email"` (the default) or `channel: "sms"`. Email templates use `subject`/`html`/`text`; SMS templates use `body`. Filter the list with `templates.list({ channel })`.
+Templates are channel-aware: pass `channel: "email"` (the default) or `channel: "sms"`. Email templates use `subject`/`html`/`text`; SMS templates use `body`. Filter the list with `templates.list({ channel, status, limit, cursor })`.
+
+Templates start as **drafts** and must be published before they can send. Sends render the published snapshot, so editing a live template never changes in-flight mail until you `publish` again. Declared `variables` are typed (`string`/`number`/`boolean`) and may carry a `fallback_value`; a missing `required` variable with no fallback fails the send with 422.
 
 ```ts
 const template = await sendstack.templates.create({
@@ -311,7 +313,8 @@ const template = await sendstack.templates.create({
   slug: "welcome",
   subject: "Welcome, {{firstName}}",
   html: "<p>Hello {{firstName}}</p>",
-  text: "Hello {{firstName}}",
+  variables: [{ name: "firstName", type: "string", required: true }],
+  publish: true, // create and publish in one call; omit to keep it a draft
 });
 
 await sendstack.emails.send({
@@ -320,6 +323,11 @@ await sendstack.emails.send({
   templateId: template.id,
   templateData: { firstName: "Amina" },
 });
+
+// Edit safely, then publish to go live; or clone into a new draft.
+await sendstack.templates.update(template.id, { html: "<p>Welcome, {{firstName}}!</p>" });
+await sendstack.templates.publish(template.id);
+const copy = await sendstack.templates.duplicate(template.id, { name: "Welcome v2" });
 ```
 
 Render any template against sample data with `templates.preview` before sending — for SMS the preview returns the `segments` count so you can check cost up front:

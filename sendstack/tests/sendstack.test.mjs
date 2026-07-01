@@ -405,6 +405,21 @@ test("all OpenAPI resource methods hit the expected SendStack endpoints", async 
       },
       {
         assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates/tpl_1/publish");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse(template({ status: "published" })),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/templates/tpl_1/duplicate");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), { name: "Copy" });
+        },
+        response: createJsonResponse(template({ id: "tpl_2", status: "draft" }), { status: 201 }),
+      },
+      {
+        assert: (input, init) => {
           assert.equal(String(input), "https://mailer.norialabs.com/api/webhook-endpoints");
           assert.equal(init.method, "POST");
           assert.deepEqual(JSON.parse(init.body), {
@@ -519,6 +534,8 @@ test("all OpenAPI resource methods hit the expected SendStack endpoints", async 
   assert.equal((await client.templates.get("tpl_1")).id, "tpl_1");
   assert.equal((await client.templates.update("tpl_1", { subject: "Updated", html: null })).subject, "Updated");
   assert.equal(await client.templates.remove("tpl_1"), undefined);
+  assert.equal((await client.templates.publish("tpl_1")).status, "published");
+  assert.equal((await client.templates.duplicate("tpl_1", { name: "Copy" })).id, "tpl_2");
   assert.equal((await client.webhooks.create({
     url: "https://example.com/webhooks/sendstack",
     eventTypes: ["email.sent"],
