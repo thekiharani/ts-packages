@@ -200,10 +200,10 @@ await sms.send({ to: "+254700000000", body: "Your code is 4821" });
 With `sms: { from }` set on the client (above), a send only needs `to` and `body`; pass `from` on the call to override for one message:
 
 ```ts
-// Uses the client default sender.
+// Uses the client default sender. Render a saved template with template_data.
 await sendstack.sms.send({
   to: "+254700000000",
-  body: "Your code is {{ code }}",
+  templateId: "otp",
   templateData: { code: "1234" },
 });
 
@@ -317,10 +317,8 @@ const template = await sendstack.templates.create({
 await sendstack.emails.send({
   from: "hello@example.com",
   to: "friend@example.com",
-  template: {
-    id: template.id,
-    variables: { firstName: "Amina" },
-  },
+  templateId: template.id,
+  templateData: { firstName: "Amina" },
 });
 ```
 
@@ -336,7 +334,7 @@ const otp = await sendstack.templates.create({
 
 const preview = await sendstack.templates.preview({
   templateId: otp.id,
-  data: { code: "4821" },
+  templateData: { code: "4821" },
 });
 // { channel: "sms", body: "Your code is 4821", segments: 1, variables: ["code"], ... }
 ```

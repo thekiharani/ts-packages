@@ -52,11 +52,6 @@ export interface UploadedAttachment {
   content_type: string | null;
 }
 
-export interface TemplateReference {
-  id: string;
-  variables?: Record<string, unknown>;
-}
-
 export interface SendEmailRequest {
   from?: string;
   to: Recipient;
@@ -81,7 +76,6 @@ export interface SendEmailRequest {
   template_id?: string;
   templateData?: Record<string, unknown>;
   template_data?: Record<string, unknown>;
-  template?: TemplateReference;
   scheduledAt?: string | Date;
   scheduled_at?: string | Date;
 }
@@ -202,7 +196,8 @@ export interface PreviewTemplateRequest {
   html?: string;
   text?: string;
   body?: string;
-  data?: Record<string, unknown>;
+  templateData?: Record<string, unknown>;
+  template_data?: Record<string, unknown>;
 }
 
 export interface TemplatePreview {

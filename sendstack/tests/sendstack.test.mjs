@@ -684,7 +684,7 @@ test("sms.send without a client sender_id omits it; templates support preview, c
           assert.equal(init.method, "POST");
           assert.deepEqual(JSON.parse(init.body), {
             template_id: "tpl_otp",
-            data: { code: "1234" },
+            template_data: { code: "1234" },
           });
         },
         response: createJsonResponse({
@@ -723,7 +723,7 @@ test("sms.send without a client sender_id omits it; templates support preview, c
   assert.equal((await client.sms.send({ to: "+254700000000", body: "Hi" })).id, "sms_1");
   assert.equal((await client.templates.preview({
     templateId: "tpl_otp",
-    data: { code: "1234" },
+    templateData: { code: "1234" },
   })).segments, 1);
   assert.equal((await client.templates.create({
     channel: "sms",

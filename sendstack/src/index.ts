@@ -115,7 +115,6 @@ export type {
   SuccessEnvelope,
   Suppression,
   SuppressionReason,
-  TemplateReference,
   UpdateTemplateRequest,
   UpdateWebhookEndpointRequest,
   UploadAttachmentRequest,
@@ -731,6 +730,7 @@ function normalizeTemplateRequest(
 function normalizeTemplatePreviewRequest(request: PreviewTemplateRequest): Record<string, unknown> {
   const payload = { ...request } as Record<string, unknown>;
   renameAlias(payload, "templateId", "template_id");
+  renameAlias(payload, "templateData", "template_data");
   return payload;
 }
 
