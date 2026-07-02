@@ -258,15 +258,17 @@ await sendstack.sms.sendBatch([
 
 WhatsApp is sent over the official Meta Cloud API. A send is exactly one content mode:
 
-- an approved `template` (business-initiated — the only mode that can open a new conversation);
+- a saved `templateId` + `templateData` (business-initiated — the recommended, cross-channel-consistent way, identical to email and SMS);
 - a free-form `text` or `media` reply (deliverable only inside the 24-hour customer service window);
-- a local `templateId` that renders one of your saved WhatsApp templates.
+- an inline `template` — the advanced escape hatch for a Meta-approved template you manage directly in Meta rather than mirroring in SendStack.
 
 ```ts
-// Business-initiated: an approved Meta template with ordered body variables.
+// Recommended: render a saved WhatsApp template — same shape as emails.send / sms.send.
+// SendStack maps your named data onto the ordered parameters Meta expects.
 await sendstack.whatsapp.send({
   to: "+254700000000",
-  template: { name: "order_update", language: "en_US", variables: ["A. Doe", "#1042"] },
+  templateId: "order_update",
+  templateData: { name: "A. Doe", ref: "#1042" },
 });
 
 // Free-form reply inside the 24h window (uses the client default sender).
@@ -276,6 +278,12 @@ await sendstack.whatsapp.send({ to: "+254700000000", text: "Thanks — your orde
 await sendstack.whatsapp.send({
   to: "+254700000000",
   media: { type: "image", link: "https://cdn.example.com/receipt.png", caption: "Your receipt" },
+});
+
+// Advanced: reference a Meta-approved template directly (positional params, WhatsApp-only).
+await sendstack.whatsapp.send({
+  to: "+254700000000",
+  template: { name: "order_update", language: "en_US", variables: ["A. Doe", "#1042"] },
 });
 ```
 
@@ -297,7 +305,7 @@ await sendstack.whatsappSenders.setDefault(sender.id);
 await sendstack.whatsappSenders.remove(sender.id);
 ```
 
-WhatsApp templates are created through the same `templates.*` methods with `channel: "whatsapp"`, using `templateName`, `language`, and `bodyVariables`.
+WhatsApp templates are created through the same `templates.*` methods with `channel: "whatsapp"`, using `templateName`, `language`, and `bodyVariables`. Give `bodyVariables` named `{{ placeholder }}` values in Meta's parameter order (e.g. `["{{name}}", "{{ref}}"]`) — those names are what `templateData` fills at send time, so a WhatsApp template is authored just like an email or SMS one.
 
 ## Attachments
 
