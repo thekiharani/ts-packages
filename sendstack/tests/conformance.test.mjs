@@ -34,8 +34,22 @@ function normalize(path) {
 function argsFor(name) {
   if (name === "sendBatch") return [[]];
   if (name === "list") return [];
-  if (name === "update") return [SENTINEL, {}];
-  if (["get", "events", "cancel", "requeue", "verify", "retry", "remove", "publish", "duplicate"].includes(name)) {
+  if (["update", "uploadKyc", "pay"].includes(name)) return [SENTINEL, {}];
+  if (
+    [
+      "get",
+      "events",
+      "cancel",
+      "requeue",
+      "verify",
+      "retry",
+      "remove",
+      "publish",
+      "duplicate",
+      "setDefault",
+      "payment",
+    ].includes(name)
+  ) {
     return [SENTINEL];
   }
   return [{}];
@@ -83,5 +97,5 @@ test("contract has no duplicate routes", () => {
   const data = JSON.parse(readFileSync(join(HERE, "conformance-routes.json"), "utf8"));
   const pairs = data.routes.map((route) => `${route.method} ${route.path}`);
   assert.equal(pairs.length, new Set(pairs).size);
-  assert.equal(pairs.length, 35);
+  assert.equal(pairs.length, 60);
 });

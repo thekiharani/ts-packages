@@ -4,13 +4,15 @@ Official JavaScript SDK for the SendStack messaging API.
 
 Use it for:
 
-- transactional and scheduled email and SMS
-- batch email and SMS
+- transactional and scheduled email, SMS, and WhatsApp
+- batch email, SMS, and WhatsApp
 - reusable attachment uploads
 - sending domains
-- email and SMS templates (with rendered previews)
+- WhatsApp Business senders and SMS sender-ID provisioning
+- email, SMS, and WhatsApp templates (with rendered previews)
 - webhook endpoints and webhook event retries
 - suppression lists
+- billing: credits, checkout, and payment/purchase history
 
 Node `>=20` is required.
 
@@ -110,6 +112,18 @@ const sendstack = new Sendstack({
 | `sms.events(messageId, options?)` | `GET /sms/{id}/events` | `CursorPage<SmsEvent>` |
 | `sms.cancel(messageId, options?)` | `POST /sms/{id}/cancel` | `SmsMessage` |
 | `sms.requeue(messageId, options?)` | `POST /sms/{id}/requeue` | `SmsMessage` |
+| `whatsapp.send(payload, options?)` | `POST /whatsapp` | `SendWhatsAppResult` |
+| `whatsapp.sendBatch(payload, options?)` | `POST /whatsapp/batch` | `SendWhatsAppBatchResult` |
+| `whatsapp.list(options?)` | `GET /whatsapp` | `CursorPage<WhatsAppMessage>` |
+| `whatsapp.get(messageId, options?)` | `GET /whatsapp/{id}` | `WhatsAppMessage` |
+| `whatsapp.events(messageId, options?)` | `GET /whatsapp/{id}/events` | `CursorPage<WhatsAppEvent>` |
+| `whatsapp.cancel(messageId, options?)` | `POST /whatsapp/{id}/cancel` | `WhatsAppMessage` |
+| `whatsapp.requeue(messageId, options?)` | `POST /whatsapp/{id}/requeue` | `WhatsAppMessage` |
+| `whatsappSenders.list(options?)` | `GET /whatsapp/senders` | `CursorPage<WhatsAppSender>` |
+| `whatsappSenders.create(payload, options?)` | `POST /whatsapp/senders` | `WhatsAppSenderRef` |
+| `whatsappSenders.get(senderId, options?)` | `GET /whatsapp/senders/{id}` | `WhatsAppSender` |
+| `whatsappSenders.setDefault(senderId, options?)` | `POST /whatsapp/senders/{id}/default` | `WhatsAppSenderRef` |
+| `whatsappSenders.remove(senderId, options?)` | `DELETE /whatsapp/senders/{id}` | `void` |
 | `domains.create(payload, options?)` | `POST /domains` | `Domain` |
 | `domains.list(options?)` | `GET /domains` | `CursorPage<Domain>` |
 | `domains.get(domainId, options?)` | `GET /domains/{id}` | `Domain` |
@@ -128,6 +142,19 @@ const sendstack = new Sendstack({
 | `suppressions.add(payload, options?)` | `POST /suppressions` | `CreateSuppressionResult` |
 | `suppressions.list(options?)` | `GET /suppressions` | `CursorPage<Suppression>` |
 | `suppressions.remove(recipient, options?)` | `DELETE /suppressions/{recipient}` | `void` |
+| `senders.options(options?)` | `GET /sms/senders/options` | `SenderIdOptions` |
+| `senders.list(options?)` | `GET /sms/senders` | `SendstackList<SenderIdRequest>` |
+| `senders.create(payload, options?)` | `POST /sms/senders` | `SenderIdRequestRef` |
+| `senders.get(senderId, options?)` | `GET /sms/senders/{id}` | `SenderIdRequest` |
+| `senders.uploadKyc(senderId, payload, options?)` | `POST /sms/senders/{id}/kyc` | `SenderIdRequestRef` |
+| `senders.pay(senderId, payload, options?)` | `POST /sms/senders/{id}/pay` | `PaySenderIdResult` |
+| `senders.authorizationLetter(options?)` | `GET /sms/authorization-letter` | `unknown` (file) |
+| `billing.credits(options?)` | `GET /billing/credits` | `CreditBalance` |
+| `billing.products(options?)` | `GET /billing/products` | `SendstackList<BillingProduct>` |
+| `billing.checkout(payload, options?)` | `POST /billing/checkout` | `CheckoutResult` |
+| `billing.payments(options?)` | `GET /billing/payments` | `SendstackList<Payment>` |
+| `billing.payment(paymentId, options?)` | `GET /billing/payments/{id}` | `Payment` |
+| `billing.purchases(options?)` | `GET /billing/purchases` | `SendstackList<Purchase>` |
 
 ## Emails
 
@@ -169,13 +196,14 @@ The SDK accepts TypeScript-friendly aliases like `replyTo`, `trackOpens`, `track
 
 ## Per-channel defaults
 
-`from` (email) and `from` (SMS) are usually constant, so set them once on the client. Each send fills the default in when the call omits it, and any per-send value overrides it:
+`from` (email), `from` (SMS) and `from` (WhatsApp) are usually constant, so set them once on the client. Each send fills the default in when the call omits it, and any per-send value overrides it:
 
 ```ts
 const sendstack = new Sendstack({
   authToken: "mlr_live_…",
   emails: { from: "Noria <hello@example.com>" },
   sms: { from: "NORIA" },
+  whatsapp: { from: "+254711000000" },
 });
 
 await sendstack.emails.send({ to: "customer@example.com", subject: "Welcome", html: "<p>Hi</p>" }); // from applied
@@ -225,6 +253,51 @@ await sendstack.sms.sendBatch([
 ```
 
 `sms.list`, `sms.get`, `sms.events`, `sms.cancel`, and `sms.requeue` mirror their `emails.*` counterparts. SMS responses include a `segments` count — billing is one credit per segment. The SMS request accepts the same TypeScript-friendly aliases (`providerId`, `templateId`, `templateData`, `scheduledAt`).
+
+## WhatsApp
+
+WhatsApp is sent over the official Meta Cloud API. A send is exactly one content mode:
+
+- an approved `template` (business-initiated — the only mode that can open a new conversation);
+- a free-form `text` or `media` reply (deliverable only inside the 24-hour customer service window);
+- a local `templateId` that renders one of your saved WhatsApp templates.
+
+```ts
+// Business-initiated: an approved Meta template with ordered body variables.
+await sendstack.whatsapp.send({
+  to: "+254700000000",
+  template: { name: "order_update", language: "en_US", variables: ["A. Doe", "#1042"] },
+});
+
+// Free-form reply inside the 24h window (uses the client default sender).
+await sendstack.whatsapp.send({ to: "+254700000000", text: "Thanks — your order is on the way." });
+
+// Media reply.
+await sendstack.whatsapp.send({
+  to: "+254700000000",
+  media: { type: "image", link: "https://cdn.example.com/receipt.png", caption: "Your receipt" },
+});
+```
+
+Batch sends accept either an array or `{ messages: [...] }`. `whatsapp.list`, `whatsapp.get`, `whatsapp.events`, `whatsapp.cancel`, and `whatsapp.requeue` mirror their `emails.*`/`sms.*` counterparts, and the request accepts the same aliases (`providerId`, `templateId`, `templateData`, `scheduledAt`). Only template (business-initiated) messages consume a credit; session replies inside the 24-hour window are free.
+
+Register and manage the WhatsApp Business numbers you send from with `whatsappSenders`. The Cloud API access token is stored encrypted and never returned on reads:
+
+```ts
+const sender = await sendstack.whatsappSenders.create({
+  phoneNumberId: "109876543210",
+  wabaId: "220011223344",
+  accessToken: "EAAG…",       // stored encrypted, never echoed back
+  displayName: "Acme Support",
+  isDefault: true,
+});
+
+await sendstack.whatsappSenders.list();
+await sendstack.whatsappSenders.setDefault(sender.id);
+await sendstack.whatsappSenders.remove(sender.id);
+```
+
+WhatsApp templates are created through the same `templates.*` methods with `channel: "whatsapp"`, using `templateName`, `language`, and `bodyVariables`.
 
 ## Attachments
 
@@ -379,6 +452,49 @@ const suppressions = await sendstack.suppressions.list();
 await sendstack.suppressions.remove("bad@example.com");
 ```
 
+## SMS sender IDs
+
+`senders.*` drives the alphanumeric SMS sender-ID provisioning flow: read the fee, networks, and KYC requirements, file a request, upload the signed authorization letter and KYC documents, then pay the one-time fee (an M-Pesa STK push).
+
+```ts
+const opts = await sendstack.senders.options(); // fee, networks, required KYC docs per entity type
+
+const request = await sendstack.senders.create({
+  requestedId: "ACME",
+  entityType: "limited_company",
+  networks: ["safaricom", "airtel"],
+});
+
+await sendstack.senders.uploadKyc(request.id, {
+  documents: [{ slug: "cert_of_incorporation", filename: "cert.pdf", contentBase64: certPdfBase64 }],
+  authLetter: { filename: "auth.pdf", contentBase64: authPdfBase64 },
+});
+
+await sendstack.senders.pay(request.id, { phone: "+254700000000" });
+
+await sendstack.senders.list();
+await sendstack.senders.get(request.id);
+```
+
+`senders.authorizationLetter()` downloads the blank authorization-letter template (a binary body, returned as-is).
+
+## Billing
+
+`billing.*` covers the credit/wallet catalog, checkout, and payment/purchase history.
+
+```ts
+const email = await sendstack.billing.credits();                 // default channel: email
+const sms = await sendstack.billing.credits({ channel: "sms" }); // { remaining, unlimited, active_packs }
+
+const products = await sendstack.billing.products();
+const checkout = await sendstack.billing.checkout({ productCode: "starter_10k", phone: "+254700000000" });
+// method defaults to "mpesa"; pass method: "wallet" to settle from the prepaid wallet.
+
+const payments = await sendstack.billing.payments({ limit: 20 });
+const payment = await sendstack.billing.payment("pay_123"); // polls the provider if a pending payment is stale
+const purchases = await sendstack.billing.purchases();
+```
+
 ## Request Options
 
 All methods accept request options. Mutating methods also accept `idempotencyKey`.
@@ -470,6 +586,7 @@ Important type exports:
 - `SendstackClientOptions`
 - `EmailDefaults`
 - `SmsDefaults`
+- `WhatsAppDefaults`
 - `SendstackRequestOptions`
 - `SendstackMutationOptions`
 - `SendstackRawRequestOptions`
@@ -488,6 +605,17 @@ Important type exports:
 - `SendSmsBatchResult`
 - `SmsMessage`
 - `SmsEvent`
+- `SendWhatsAppRequest`
+- `SendWhatsAppResult`
+- `SendWhatsAppBatchRequest`
+- `SendWhatsAppBatchResult`
+- `WhatsAppMessage`
+- `WhatsAppEvent`
+- `WhatsAppTemplateRef`
+- `WhatsAppMediaRef`
+- `CreateWhatsAppSenderRequest`
+- `WhatsAppSender`
+- `WhatsAppSenderRef`
 - `UploadAttachmentRequest`
 - `UploadedAttachment`
 - `CreateDomainRequest`
@@ -506,9 +634,26 @@ Important type exports:
 - `CreateSuppressionResult`
 - `Suppression`
 - `CursorPage`
+- `SendstackList`
+- `CreateSenderIdRequest`
+- `UploadSenderKycRequest`
+- `PaySenderIdRequest`
+- `PaySenderIdResult`
+- `SenderIdRequest`
+- `SenderIdRequestRef`
+- `SenderIdOptions`
+- `SenderIdNetwork`
+- `SenderEntityType`
+- `CreditBalance`
+- `CreditChannel`
+- `BillingProduct`
+- `CheckoutRequest`
+- `CheckoutResult`
+- `Payment`
+- `Purchase`
 
 ## Relationship To `@norialabs/sendkit`
 
-`@norialabs/sendstack` is for the SendStack email SaaS API.
+`@norialabs/sendstack` is the client for the managed SendStack messaging SaaS — email, SMS, and WhatsApp all sent, tracked, and billed through the SendStack API.
 
-Use `@norialabs/sendkit` for WhatsApp and bulk SMS gateway wrappers.
+Use `@norialabs/sendkit` when you instead want thin, direct wrappers around the underlying providers (Meta WhatsApp Cloud API, bulk SMS gateways) without the SendStack platform in between.

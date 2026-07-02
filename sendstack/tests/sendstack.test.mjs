@@ -146,6 +146,47 @@ function sms(overrides = {}) {
   };
 }
 
+function wa(overrides = {}) {
+  return {
+    id: "wamsg_1",
+    status: "queued",
+    to: "+254700000000",
+    kind: "template",
+    template_name: "order_update",
+    language: "en_US",
+    text: null,
+    sender: "+254711000000",
+    sender_id: "wsnd_1",
+    provider_id: null,
+    provider_message_id: null,
+    attempts: 0,
+    scheduled_at: null,
+    sent_at: null,
+    last_error: null,
+    metadata: {},
+    created_at: "2026-06-25T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function waSender(overrides = {}) {
+  return {
+    id: "wsnd_1",
+    identifier: "+254711000000",
+    display_name: "Acme Support",
+    status: "active",
+    is_default: true,
+    phone_number_id: "109876543210",
+    waba_id: "220011223344",
+    verified_name: "Acme Inc",
+    quality_rating: "GREEN",
+    has_own_token: false,
+    created_at: "2026-06-25T00:00:00.000Z",
+    updated_at: "2026-06-25T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 test("exports Sendstack-first names", () => {
   assert.equal(DEFAULT_BASE_URL, "https://sendstack.norialabs.com/api/v1");
   assert.equal(SendstackClient, Sendstack);
@@ -682,6 +723,358 @@ test("sms.* endpoints normalize aliases and apply the client sender_id with per-
   assert.equal((await client.sms.events("sms_1")).data[0].type, "sms.delivered");
   assert.equal((await client.sms.cancel("sms_1")).status, "canceled");
   assert.equal((await client.sms.requeue("sms_1")).status, "queued");
+});
+
+test("whatsapp.* endpoints normalize aliases and apply the client default with per-send override", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    whatsapp: { from: "+254711000000" },
+    fetch: createSequenceFetch([
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            to: "+254700000000",
+            template: { name: "order_update", language: "en_US", variables: ["A. Doe", "#1042"] },
+            from: "+254711000000",
+            provider_id: "prov_1",
+            template_id: "tpl_wa",
+            template_data: { name: "A. Doe" },
+            scheduled_at: "2026-01-01T00:00:00.000Z",
+          });
+        },
+        response: createJsonResponse(wa(), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp");
+          assert.deepEqual(JSON.parse(init.body), {
+            to: "+254700000001",
+            text: "Thanks, we got your message.",
+            from: "+254799000000",
+          });
+        },
+        response: createJsonResponse(wa({ sender: "+254799000000", kind: "text" }), { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/batch");
+          assert.deepEqual(JSON.parse(init.body), {
+            messages: [
+              { to: "+254700000002", text: "One", from: "+254711000000" },
+              { to: "+254700000003", text: "Two", from: "+254722000000" },
+            ],
+          });
+        },
+        response: createJsonResponse({
+          batch_id: "wabatch_1",
+          data: [{ id: "wamsg_2", status: "queued" }],
+        }, { status: 202 }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/batch");
+          assert.deepEqual(JSON.parse(init.body), [
+            { to: "+254700000004", text: "Solo", from: "+254711000000" },
+          ]);
+        },
+        response: createJsonResponse({
+          batch_id: "wabatch_2",
+          data: [{ id: "wamsg_3", status: "queued" }],
+        }, { status: 202 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(
+            String(input),
+            "https://mailer.norialabs.com/api/whatsapp?limit=10&cursor=cur_1&status=sent",
+          );
+        },
+        response: createJsonResponse(page([wa()], "cur_2")),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/wamsg%201");
+        },
+        response: createJsonResponse(wa({ id: "wamsg 1" })),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/wamsg_1/events");
+        },
+        response: createJsonResponse(page([
+          { id: "evt_1", type: "whatsapp.delivered", occurredAt: "2026-06-25T00:00:00.000Z" },
+        ])),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/wamsg_1/cancel");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse({ id: "wamsg_1", object: "whatsapp" }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/wamsg_1/requeue");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse({ id: "wamsg_1", object: "whatsapp" }),
+      },
+    ]),
+  });
+
+  assert.equal(client.whatsappFrom, "+254711000000");
+  assert.equal((await client.whatsapp.send({
+    to: "+254700000000",
+    template: { name: "order_update", language: "en_US", variables: ["A. Doe", "#1042"] },
+    providerId: "prov_1",
+    templateId: "tpl_wa",
+    templateData: { name: "A. Doe" },
+    scheduledAt: new Date("2026-01-01T00:00:00.000Z"),
+  })).id, "wamsg_1");
+  assert.equal((await client.whatsapp.send({
+    to: "+254700000001",
+    text: "Thanks, we got your message.",
+    from: "+254799000000",
+  })).kind, "text");
+  assert.equal((await client.whatsapp.sendBatch({
+    messages: [
+      { to: "+254700000002", text: "One" },
+      { to: "+254700000003", text: "Two", from: "+254722000000" },
+    ],
+  })).batch_id, "wabatch_1");
+  assert.equal((await client.whatsapp.sendBatch([
+    { to: "+254700000004", text: "Solo" },
+  ])).batch_id, "wabatch_2");
+  assert.equal((await client.whatsapp.list({ limit: 10, cursor: "cur_1", status: "sent" })).next_cursor, "cur_2");
+  assert.equal((await client.whatsapp.get("wamsg 1")).id, "wamsg 1");
+  assert.equal((await client.whatsapp.events("wamsg_1")).data[0].type, "whatsapp.delivered");
+  assert.equal((await client.whatsapp.cancel("wamsg_1")).id, "wamsg_1");
+  assert.equal((await client.whatsapp.requeue("wamsg_1")).id, "wamsg_1");
+});
+
+test("whatsapp.send without a client default omits from; whatsappSenders manage business numbers", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    fetch: createSequenceFetch([
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp");
+          assert.deepEqual(JSON.parse(init.body), { to: "+254700000000", text: "Hi" });
+        },
+        response: createJsonResponse(wa({ sender: null, kind: "text" }), { status: 202 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/senders");
+        },
+        response: createJsonResponse(page([waSender()])),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/senders");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            phone_number_id: "109876543210",
+            waba_id: "220011223344",
+            access_token: "EAAG...secret",
+            display_name: "Acme Support",
+            identifier: "+254711000000",
+            is_default: true,
+          });
+        },
+        response: createJsonResponse({ id: "wsnd_1", object: "whatsapp_sender" }, { status: 201 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/senders/wsnd_1");
+        },
+        response: createJsonResponse(waSender()),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/senders/wsnd_1/default");
+          assert.equal(init.method, "POST");
+        },
+        response: createJsonResponse({ id: "wsnd_1", object: "whatsapp_sender" }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/whatsapp/senders/wsnd_1");
+          assert.equal(init.method, "DELETE");
+        },
+        response: createJsonResponse({ object: "whatsapp_sender", id: "wsnd_1", deleted: true }),
+      },
+    ]),
+  });
+
+  assert.equal(client.whatsappFrom, undefined);
+  assert.equal((await client.whatsapp.send({ to: "+254700000000", text: "Hi" })).kind, "text");
+  assert.equal((await client.whatsappSenders.list()).data[0].id, "wsnd_1");
+  assert.equal((await client.whatsappSenders.create({
+    phoneNumberId: "109876543210",
+    wabaId: "220011223344",
+    accessToken: "EAAG...secret",
+    displayName: "Acme Support",
+    identifier: "+254711000000",
+    isDefault: true,
+  })).id, "wsnd_1");
+  assert.equal((await client.whatsappSenders.get("wsnd_1")).verified_name, "Acme Inc");
+  assert.equal((await client.whatsappSenders.setDefault("wsnd_1")).object, "whatsapp_sender");
+  assert.equal(await client.whatsappSenders.remove("wsnd_1"), undefined);
+});
+
+test("senders.* provisioning endpoints normalize aliases and hit the sender-ID routes", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    fetch: createSequenceFetch([
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/senders/options");
+        },
+        response: createJsonResponse({
+          fee_cents: 840000,
+          fee_kes: 8400,
+          total_schedule_cents: [840000],
+          total_schedule_kes: [8400],
+          networks: [{ code: "safaricom", label: "Safaricom" }],
+          entity_types: [{ code: "limited_company", required_documents: [{ slug: "cert", label: "Cert" }] }],
+        }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/senders");
+        },
+        response: createJsonResponse({ data: [] }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/senders");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            requested_id: "ACME",
+            entity_type: "limited_company",
+            networks: ["safaricom", "airtel"],
+          });
+        },
+        response: createJsonResponse({ id: "sir_1", object: "sender_request" }, { status: 201 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/senders/sir%201");
+        },
+        response: createJsonResponse({ id: "sir 1", requested_id: "ACME" }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/senders/sir_1/kyc");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            documents: [
+              { slug: "cert", filename: "cert.pdf", content_base64: "AAAA", content_type: "application/pdf" },
+              "passthrough",
+            ],
+            auth_letter: { filename: "auth.pdf", content_base64: "BBBB" },
+          });
+        },
+        response: createJsonResponse({ id: "sir_1", object: "sender_request" }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/senders/sir_1/pay");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), { phone: "+254700000000" });
+        },
+        response: createJsonResponse({ payment_id: "pay_1", status: "pending", customer_message: "Enter PIN" }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/sms/authorization-letter");
+        },
+        response: createTextResponse("PDFBYTES", { headers: { "content-type": "application/octet-stream" } }),
+      },
+    ]),
+  });
+
+  assert.equal((await client.senders.options()).fee_kes, 8400);
+  assert.deepEqual((await client.senders.list()).data, []);
+  assert.equal((await client.senders.create({
+    requestedId: "ACME",
+    entityType: "limited_company",
+    networks: ["safaricom", "airtel"],
+  })).id, "sir_1");
+  assert.equal((await client.senders.get("sir 1")).id, "sir 1");
+  assert.equal((await client.senders.uploadKyc("sir_1", {
+    documents: [
+      { slug: "cert", filename: "cert.pdf", contentBase64: "AAAA", contentType: "application/pdf" },
+      "passthrough",
+    ],
+    authLetter: { filename: "auth.pdf", contentBase64: "BBBB" },
+  })).object, "sender_request");
+  assert.equal((await client.senders.pay("sir_1", { phone: "+254700000000" })).payment_id, "pay_1");
+  assert.equal(await client.senders.authorizationLetter(), "PDFBYTES");
+});
+
+test("billing.* endpoints merge query params and normalize the checkout body", async () => {
+  const client = new Sendstack("mlr_live_123", {
+    baseUrl: "https://mailer.norialabs.com/api",
+    fetch: createSequenceFetch([
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/billing/credits?channel=sms");
+        },
+        response: createJsonResponse({ remaining: 4200, unlimited: false, active_packs: 2 }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/billing/products");
+        },
+        response: createJsonResponse({ data: [{ code: "pro_monthly", name: "Pro" }] }),
+      },
+      {
+        assert: (input, init) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/billing/checkout");
+          assert.equal(init.method, "POST");
+          assert.deepEqual(JSON.parse(init.body), {
+            product_code: "pro_monthly",
+            phone: "+254700000000",
+            method: "mpesa",
+          });
+        },
+        response: createJsonResponse({ payment_id: "pay_1", status: "pending", customer_message: "Enter PIN" }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/billing/payments?limit=5");
+        },
+        response: createJsonResponse({ data: [{ id: "pay_1", status: "completed" }] }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/billing/payments/pay_1");
+        },
+        response: createJsonResponse({ id: "pay_1", status: "completed" }),
+      },
+      {
+        assert: (input) => {
+          assert.equal(String(input), "https://mailer.norialabs.com/api/billing/purchases");
+        },
+        response: createJsonResponse({ data: [{ id: "pur_1", kind: "credit_pack" }] }),
+      },
+    ]),
+  });
+
+  assert.equal((await client.billing.credits({ channel: "sms" })).remaining, 4200);
+  assert.equal((await client.billing.products()).data[0].code, "pro_monthly");
+  assert.equal((await client.billing.checkout({
+    productCode: "pro_monthly",
+    phone: "+254700000000",
+    method: "mpesa",
+  })).payment_id, "pay_1");
+  assert.equal((await client.billing.payments({ limit: 5 })).data[0].id, "pay_1");
+  assert.equal((await client.billing.payment("pay_1")).status, "completed");
+  assert.equal((await client.billing.purchases()).data[0].id, "pur_1");
 });
 
 test("sms.send without a client sender_id omits it; templates support preview, channel, and sampleData", async () => {
