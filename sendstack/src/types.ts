@@ -11,7 +11,8 @@ export type SendstackBody =
 
 export type EmailStatus = "queued" | "sending" | "sent" | "failed" | "canceled";
 export type SmsStatus = EmailStatus;
-export type TemplateChannel = "email" | "sms";
+export type WhatsAppStatus = EmailStatus;
+export type TemplateChannel = "email" | "sms" | "whatsapp";
 export type DomainRegion = "af-south-1" | "us-east-1" | "eu-central-1";
 export type DomainTlsPolicy = "opportunistic" | "enforced";
 export type DomainCapability = "enabled" | "disabled";
@@ -180,6 +181,14 @@ export interface CreateTemplateRequest {
   html?: string;
   text?: string;
   body?: string;
+  /** WhatsApp templates: the approved Meta template name. */
+  templateName?: string;
+  template_name?: string;
+  /** WhatsApp templates: BCP-47 language tag of the approved template (e.g. `en_US`). */
+  language?: string;
+  /** WhatsApp templates: ordered names for the `{{1}}`, `{{2}}`… body placeholders. */
+  bodyVariables?: string[];
+  body_variables?: string[];
   variables?: TemplateVariable[];
   sampleData?: Record<string, unknown>;
   sample_data?: Record<string, unknown>;
@@ -201,6 +210,11 @@ export interface UpdateTemplateRequest {
   html?: string | null;
   text?: string | null;
   body?: string;
+  templateName?: string;
+  template_name?: string;
+  language?: string;
+  bodyVariables?: string[];
+  body_variables?: string[];
   variables?: TemplateVariable[];
   sampleData?: Record<string, unknown>;
   sample_data?: Record<string, unknown>;
@@ -327,6 +341,308 @@ export interface ListSmsOptions {
   limit?: number;
   cursor?: string;
   status?: SmsStatus;
+}
+
+export type WhatsAppTemplateCategory = "marketing" | "utility" | "authentication";
+
+export interface WhatsAppTemplateRef {
+  name: string;
+  /** BCP-47 language tag of the approved template (e.g. `en_US`). */
+  language: string;
+  /** Values for the template's `{{1}}`, `{{2}}`… body placeholders, in order. */
+  variables?: string[];
+  category?: WhatsAppTemplateCategory;
+}
+
+export interface WhatsAppMediaRef {
+  type: "image" | "document" | "video";
+  link: string;
+  caption?: string;
+  filename?: string;
+}
+
+/** A send is exactly one content mode: an approved `template` (business-initiated), a
+ *  free-form `text` or `media` reply (deliverable only inside the 24h window), or a
+ *  local `templateId` reference. */
+export interface SendWhatsAppRequest {
+  to: string;
+  from?: string;
+  template?: WhatsAppTemplateRef;
+  text?: string;
+  media?: WhatsAppMediaRef;
+  providerId?: string;
+  provider_id?: string;
+  metadata?: Record<string, string>;
+  templateId?: string;
+  template_id?: string;
+  templateData?: Record<string, unknown>;
+  template_data?: Record<string, unknown>;
+  scheduledAt?: string | Date;
+  scheduled_at?: string | Date;
+}
+
+export type SendWhatsAppBatchRequest = SendWhatsAppRequest[] | {
+  messages: SendWhatsAppRequest[];
+};
+
+export interface SendWhatsAppResult {
+  id: string;
+  status: string;
+}
+
+export interface SendWhatsAppBatchResult {
+  batch_id: string;
+  data: SendWhatsAppResult[];
+}
+
+export interface WhatsAppMessage {
+  id: string;
+  status: string;
+  to: string;
+  kind: string;
+  template_name: string | null;
+  language: string | null;
+  text: string | null;
+  sender: string | null;
+  sender_id: string | null;
+  provider_id: string | null;
+  provider_message_id: string | null;
+  attempts: number;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  last_error: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface WhatsAppEvent {
+  id: string;
+  type: string;
+  occurredAt: string;
+  [key: string]: unknown;
+}
+
+export interface ListWhatsAppOptions {
+  limit?: number;
+  cursor?: string;
+  status?: WhatsAppStatus;
+}
+
+export interface CreateWhatsAppSenderRequest {
+  phoneNumberId?: string;
+  phone_number_id?: string;
+  wabaId?: string;
+  waba_id?: string;
+  /** Cloud API access token; stored encrypted and never echoed back. */
+  accessToken?: string;
+  access_token?: string;
+  displayName?: string;
+  display_name?: string;
+  identifier?: string;
+  isDefault?: boolean;
+  is_default?: boolean;
+}
+
+export interface WhatsAppSender {
+  id: string;
+  identifier: string;
+  display_name: string | null;
+  status: string;
+  is_default: boolean;
+  phone_number_id: string | null;
+  waba_id: string | null;
+  verified_name: string | null;
+  quality_rating: string | null;
+  has_own_token: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WhatsAppSenderRef {
+  id: string;
+  object: string;
+}
+
+/** A non-paginated collection response (`{ data }` with no cursor), used by the
+ *  sender-ID and billing list endpoints. */
+export interface SendstackList<T> {
+  data: T[];
+}
+
+export type SenderIdNetwork = "safaricom" | "airtel" | "telkom";
+export type SenderEntityType = "limited_company" | "sole_proprietor";
+
+export interface CreateSenderIdRequest {
+  requestedId?: string;
+  requested_id?: string;
+  entityType?: SenderEntityType;
+  entity_type?: SenderEntityType;
+  networks: SenderIdNetwork[];
+}
+
+export interface SenderKycDocument {
+  slug: string;
+  filename: string;
+  contentBase64?: string;
+  content_base64?: string;
+  contentType?: string;
+  content_type?: string;
+}
+
+export interface SenderAuthLetter {
+  filename: string;
+  contentBase64?: string;
+  content_base64?: string;
+  contentType?: string;
+  content_type?: string;
+}
+
+export interface UploadSenderKycRequest {
+  documents?: SenderKycDocument[];
+  authLetter?: SenderAuthLetter;
+  auth_letter?: SenderAuthLetter;
+}
+
+export interface PaySenderIdRequest {
+  phone: string;
+}
+
+export interface PaySenderIdResult {
+  payment_id: string;
+  status: string;
+  customer_message: string | null;
+}
+
+export interface SenderIdNetworkState {
+  status: string;
+  fee_cents: number;
+  approved_at?: string | null;
+  failure_reason?: string | null;
+}
+
+export interface SenderIdRequest {
+  id: string;
+  requested_id: string;
+  entity_type: string;
+  status: string;
+  networks: Record<string, SenderIdNetworkState>;
+  total_cents: number;
+  total_kes: number | null;
+  missing_kyc: string[];
+  kyc_documents: string[];
+  has_auth_letter: boolean;
+  submitted_via: string;
+  sender_id: string | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SenderIdRequestRef {
+  id: string;
+  object: string;
+}
+
+export interface SenderIdOptions {
+  fee_cents: number;
+  fee_kes: number;
+  total_schedule_cents: number[];
+  total_schedule_kes: number[];
+  networks: Array<{ code: string; label: string }>;
+  entity_types: Array<{
+    code: string;
+    required_documents: Array<{ slug: string; label: string }>;
+  }>;
+}
+
+export type CreditChannel = "email" | "sms" | "whatsapp";
+
+export interface CreditsOptions {
+  channel?: CreditChannel;
+}
+
+export interface CreditBalance {
+  remaining: number | null;
+  unlimited: boolean;
+  active_packs: number;
+}
+
+export interface BillingProduct {
+  code: string;
+  name: string;
+  description: string | null;
+  kind: string;
+  tier: string | null;
+  currency: string;
+  price_cents: number;
+  price_kes: number | null;
+  billing_period: string;
+  setup_fee_cents: number | null;
+  setup_fee_kes: number | null;
+  email_credits: number | null;
+  sms_credits: number | null;
+  validity_days: number | null;
+  limits: {
+    max_seats: number | null;
+    max_domains: number | null;
+    max_api_keys: number | null;
+    max_dedicated_ips: number | null;
+    daily_email_limit: number | null;
+    rate_limit_per_min: number | null;
+  };
+  features: Record<string, unknown>;
+  support_level: string;
+}
+
+export interface CheckoutRequest {
+  productCode?: string;
+  product_code?: string;
+  phone?: string;
+  method?: "mpesa" | "wallet";
+}
+
+export interface CheckoutResult {
+  payment_id: string | null;
+  status: string;
+  purchase_id?: string | null;
+  balance_cents?: number | null;
+  customer_message: string | null;
+}
+
+export interface ListPaymentsOptions {
+  limit?: number;
+}
+
+export interface Payment {
+  id: string;
+  product_id: string | null;
+  purpose: string;
+  purchase_id: string | null;
+  status: string;
+  method: string;
+  currency: string;
+  amount_cents: number;
+  amount_kes: number | null;
+  payer_phone: string | null;
+  provider_txn_code: string | null;
+  failure_reason: string | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface Purchase {
+  id: string;
+  kind: string;
+  status: string;
+  quantity: number;
+  amount_cents: number;
+  amount_kes: number | null;
+  email_credits_granted: number | null;
+  email_credits_remaining: number | null;
+  starts_at: string;
+  expires_at: string | null;
+  payment_method: string | null;
+  created_at: string;
 }
 
 export type KnownWebhookEvent =
@@ -497,11 +813,17 @@ export interface SmsDefaults {
   from?: string;
 }
 
+export interface WhatsAppDefaults {
+  /** Default sender (business number or its id) applied to every WhatsApp send when the call omits one. */
+  from?: string;
+}
+
 export interface SendstackClientOptions {
   baseUrl?: string;
   authToken?: string;
   emails?: EmailDefaults;
   sms?: SmsDefaults;
+  whatsapp?: WhatsAppDefaults;
   fetch?: typeof fetch;
   timeoutMs?: number;
   headers?: HeadersInit;

@@ -14,6 +14,7 @@ import type {
   EmailTemplate,
   ListEmailsOptions,
   ListSmsOptions,
+  ListWhatsAppOptions,
   ListTemplatesOptions,
   PreviewTemplateRequest,
   PublishableTemplate,
@@ -26,9 +27,34 @@ import type {
   SendSmsBatchResult,
   SendSmsRequest,
   SendSmsResult,
+  SendWhatsAppBatchRequest,
+  SendWhatsAppBatchResult,
+  SendWhatsAppRequest,
+  SendWhatsAppResult,
   SmsDefaults,
   SmsMessage,
   SmsEvent,
+  CreateWhatsAppSenderRequest,
+  WhatsAppMessage,
+  WhatsAppEvent,
+  WhatsAppSender,
+  WhatsAppSenderRef,
+  SendstackList,
+  CreateSenderIdRequest,
+  UploadSenderKycRequest,
+  PaySenderIdRequest,
+  PaySenderIdResult,
+  SenderIdRequest,
+  SenderIdRequestRef,
+  SenderIdOptions,
+  CreditsOptions,
+  CreditBalance,
+  BillingProduct,
+  CheckoutRequest,
+  CheckoutResult,
+  ListPaymentsOptions,
+  Payment,
+  Purchase,
   TemplatePreview,
   SendstackAuthStrategy,
   SendstackBody,
@@ -79,6 +105,7 @@ export type {
   KnownWebhookEvent,
   ListEmailsOptions,
   ListSmsOptions,
+  ListWhatsAppOptions,
   ListTemplatesOptions,
   PreviewTemplateRequest,
   PublishableTemplate,
@@ -92,10 +119,46 @@ export type {
   SendSmsBatchResult,
   SendSmsRequest,
   SendSmsResult,
+  SendWhatsAppBatchRequest,
+  SendWhatsAppBatchResult,
+  SendWhatsAppRequest,
+  SendWhatsAppResult,
   SmsDefaults,
   SmsEvent,
   SmsMessage,
   SmsStatus,
+  CreateWhatsAppSenderRequest,
+  WhatsAppDefaults,
+  WhatsAppEvent,
+  WhatsAppMediaRef,
+  WhatsAppMessage,
+  WhatsAppSender,
+  WhatsAppSenderRef,
+  WhatsAppStatus,
+  WhatsAppTemplateCategory,
+  WhatsAppTemplateRef,
+  SendstackList,
+  SenderIdNetwork,
+  SenderEntityType,
+  CreateSenderIdRequest,
+  SenderKycDocument,
+  SenderAuthLetter,
+  UploadSenderKycRequest,
+  PaySenderIdRequest,
+  PaySenderIdResult,
+  SenderIdNetworkState,
+  SenderIdRequest,
+  SenderIdRequestRef,
+  SenderIdOptions,
+  CreditChannel,
+  CreditsOptions,
+  CreditBalance,
+  BillingProduct,
+  CheckoutRequest,
+  CheckoutResult,
+  ListPaymentsOptions,
+  Payment,
+  Purchase,
   TemplateChannel,
   TemplatePreview,
   TemplateVariable,
@@ -137,6 +200,7 @@ export class Sendstack {
   readonly authToken: string;
   readonly emailFrom: string | undefined;
   readonly smsSenderId: string | undefined;
+  readonly whatsappFrom: string | undefined;
   readonly baseUrl: string;
   readonly timeoutMs: number;
   readonly attachments: {
@@ -212,6 +276,64 @@ export class Sendstack {
     cancel: (id: string, options?: SendstackMutationOptions) => Promise<SmsMessage>;
     requeue: (id: string, options?: SendstackMutationOptions) => Promise<SmsMessage>;
   };
+  readonly whatsapp: {
+    send: <TRequest extends SendWhatsAppRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SendWhatsAppResult>;
+    sendBatch: <TRequest extends SendWhatsAppBatchRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SendWhatsAppBatchResult>;
+    list: <TOptions extends ListWhatsAppOptions & SendstackRequestOptions>(
+      options?: TOptions,
+    ) => Promise<CursorPage<WhatsAppMessage>>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<WhatsAppMessage>;
+    events: (id: string, options?: SendstackRequestOptions) => Promise<CursorPage<WhatsAppEvent>>;
+    cancel: (id: string, options?: SendstackMutationOptions) => Promise<WhatsAppMessage>;
+    requeue: (id: string, options?: SendstackMutationOptions) => Promise<WhatsAppMessage>;
+  };
+  readonly whatsappSenders: {
+    list: (options?: SendstackRequestOptions) => Promise<CursorPage<WhatsAppSender>>;
+    create: <TRequest extends CreateWhatsAppSenderRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<WhatsAppSenderRef>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<WhatsAppSender>;
+    setDefault: (id: string, options?: SendstackMutationOptions) => Promise<WhatsAppSenderRef>;
+    remove: (id: string, options?: SendstackMutationOptions) => Promise<void>;
+  };
+  readonly senders: {
+    options: (options?: SendstackRequestOptions) => Promise<SenderIdOptions>;
+    list: (options?: SendstackRequestOptions) => Promise<SendstackList<SenderIdRequest>>;
+    create: <TRequest extends CreateSenderIdRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SenderIdRequestRef>;
+    get: (id: string, options?: SendstackRequestOptions) => Promise<SenderIdRequest>;
+    uploadKyc: <TRequest extends UploadSenderKycRequest>(
+      id: string,
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<SenderIdRequestRef>;
+    pay: <TRequest extends PaySenderIdRequest>(
+      id: string,
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<PaySenderIdResult>;
+    authorizationLetter: (options?: SendstackRequestOptions) => Promise<unknown>;
+  };
+  readonly billing: {
+    credits: (options?: CreditsOptions & SendstackRequestOptions) => Promise<CreditBalance>;
+    products: (options?: SendstackRequestOptions) => Promise<SendstackList<BillingProduct>>;
+    checkout: <TRequest extends CheckoutRequest>(
+      request: TRequest,
+      options?: SendstackMutationOptions,
+    ) => Promise<CheckoutResult>;
+    payments: (options?: ListPaymentsOptions & SendstackRequestOptions) => Promise<SendstackList<Payment>>;
+    payment: (id: string, options?: SendstackRequestOptions) => Promise<Payment>;
+    purchases: (options?: SendstackRequestOptions) => Promise<SendstackList<Purchase>>;
+  };
   readonly webhooks: {
     create: <TRequest extends CreateWebhookEndpointRequest>(
       request: TRequest,
@@ -264,6 +386,7 @@ export class Sendstack {
     this.authToken = normalizedToken;
     this.emailFrom = normalizeDefault(options.emails?.from);
     this.smsSenderId = normalizeDefault(options.sms?.from);
+    this.whatsappFrom = normalizeDefault(options.whatsapp?.from);
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.#fetch = options.fetch ?? fetch;
@@ -425,6 +548,118 @@ export class Sendstack {
           ...requestOptions,
           idempotencyKey: requestOptions?.idempotencyKey,
         }),
+    };
+
+    this.whatsapp = {
+      send: (request, requestOptions) =>
+        this.request("POST", "/whatsapp", {
+          ...requestOptions,
+          body: normalizeSendWhatsAppRequest(request, this.whatsappFrom),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      sendBatch: (request, requestOptions) =>
+        this.request("POST", "/whatsapp/batch", {
+          ...requestOptions,
+          body: normalizeSendWhatsAppBatchRequest(request, this.whatsappFrom),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      list: (requestOptions) =>
+        this.request("GET", "/whatsapp", {
+          ...requestOptions,
+          query: mergeWhatsAppListQuery(requestOptions),
+        }),
+      get: (id, requestOptions) =>
+        this.request("GET", `/whatsapp/${encodeURIComponent(id)}`, requestOptions),
+      events: (id, requestOptions) =>
+        this.request("GET", `/whatsapp/${encodeURIComponent(id)}/events`, requestOptions),
+      cancel: (id, requestOptions) =>
+        this.request("POST", `/whatsapp/${encodeURIComponent(id)}/cancel`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      requeue: (id, requestOptions) =>
+        this.request("POST", `/whatsapp/${encodeURIComponent(id)}/requeue`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+    };
+
+    this.whatsappSenders = {
+      list: (requestOptions) =>
+        this.request("GET", "/whatsapp/senders", requestOptions),
+      create: (request, requestOptions) =>
+        this.request("POST", "/whatsapp/senders", {
+          ...requestOptions,
+          body: normalizeCreateWhatsAppSenderRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      get: (id, requestOptions) =>
+        this.request("GET", `/whatsapp/senders/${encodeURIComponent(id)}`, requestOptions),
+      setDefault: (id, requestOptions) =>
+        this.request("POST", `/whatsapp/senders/${encodeURIComponent(id)}/default`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      remove: async (id, requestOptions) => {
+        await this.request("DELETE", `/whatsapp/senders/${encodeURIComponent(id)}`, {
+          ...requestOptions,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        });
+      },
+    };
+
+    this.senders = {
+      options: (requestOptions) =>
+        this.request("GET", "/sms/senders/options", requestOptions),
+      list: (requestOptions) =>
+        this.request("GET", "/sms/senders", requestOptions),
+      create: (request, requestOptions) =>
+        this.request("POST", "/sms/senders", {
+          ...requestOptions,
+          body: normalizeCreateSenderIdRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      get: (id, requestOptions) =>
+        this.request("GET", `/sms/senders/${encodeURIComponent(id)}`, requestOptions),
+      uploadKyc: (id, request, requestOptions) =>
+        this.request("POST", `/sms/senders/${encodeURIComponent(id)}/kyc`, {
+          ...requestOptions,
+          body: normalizeUploadSenderKycRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      pay: (id, request, requestOptions) =>
+        this.request("POST", `/sms/senders/${encodeURIComponent(id)}/pay`, {
+          ...requestOptions,
+          body: request,
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      authorizationLetter: (requestOptions) =>
+        this.request("GET", "/sms/authorization-letter", requestOptions),
+    };
+
+    this.billing = {
+      credits: (requestOptions) =>
+        this.request("GET", "/billing/credits", {
+          ...requestOptions,
+          query: mergeCreditsQuery(requestOptions),
+        }),
+      products: (requestOptions) =>
+        this.request("GET", "/billing/products", requestOptions),
+      checkout: (request, requestOptions) =>
+        this.request("POST", "/billing/checkout", {
+          ...requestOptions,
+          body: normalizeCheckoutRequest(request),
+          idempotencyKey: requestOptions?.idempotencyKey,
+        }),
+      payments: (requestOptions) =>
+        this.request("GET", "/billing/payments", {
+          ...requestOptions,
+          query: mergePaymentsQuery(requestOptions),
+        }),
+      payment: (id, requestOptions) =>
+        this.request("GET", `/billing/payments/${encodeURIComponent(id)}`, requestOptions),
+      purchases: (requestOptions) =>
+        this.request("GET", "/billing/purchases", requestOptions),
     };
 
     this.webhooks = {
@@ -752,6 +987,8 @@ function normalizeTemplateRequest(
   renameAlias(payload, "sampleData", "sample_data");
   renameAlias(payload, "fromName", "from_name");
   renameAlias(payload, "replyTo", "reply_to");
+  renameAlias(payload, "templateName", "template_name");
+  renameAlias(payload, "bodyVariables", "body_variables");
   return payload;
 }
 
@@ -793,6 +1030,86 @@ function normalizeSendSmsRequest(
     payload["from"] = defaultSenderId;
   }
 
+  return payload;
+}
+
+function normalizeSendWhatsAppBatchRequest(
+  request: SendWhatsAppBatchRequest,
+  defaultFrom: string | undefined,
+): Record<string, unknown> | Array<Record<string, unknown>> {
+  if (Array.isArray(request)) {
+    return request.map((message) => normalizeSendWhatsAppRequest(message, defaultFrom));
+  }
+
+  return {
+    messages: request.messages.map((message) => normalizeSendWhatsAppRequest(message, defaultFrom)),
+  };
+}
+
+function normalizeSendWhatsAppRequest(
+  request: SendWhatsAppRequest,
+  defaultFrom: string | undefined,
+): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "providerId", "provider_id");
+  renameAlias(payload, "templateId", "template_id");
+  renameAlias(payload, "templateData", "template_data");
+  renameAlias(payload, "scheduledAt", "scheduled_at");
+
+  if (payload["scheduled_at"] instanceof Date) {
+    payload["scheduled_at"] = payload["scheduled_at"].toISOString();
+  }
+
+  if (defaultFrom !== undefined && payload["from"] === undefined) {
+    payload["from"] = defaultFrom;
+  }
+
+  return payload;
+}
+
+function normalizeCreateWhatsAppSenderRequest(request: CreateWhatsAppSenderRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "phoneNumberId", "phone_number_id");
+  renameAlias(payload, "wabaId", "waba_id");
+  renameAlias(payload, "accessToken", "access_token");
+  renameAlias(payload, "displayName", "display_name");
+  renameAlias(payload, "isDefault", "is_default");
+  return payload;
+}
+
+function normalizeCreateSenderIdRequest(request: CreateSenderIdRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "requestedId", "requested_id");
+  renameAlias(payload, "entityType", "entity_type");
+  return payload;
+}
+
+function normalizeKycFile(file: Record<string, unknown>): Record<string, unknown> {
+  const payload = { ...file };
+  renameAlias(payload, "contentBase64", "content_base64");
+  renameAlias(payload, "contentType", "content_type");
+  return payload;
+}
+
+function normalizeUploadSenderKycRequest(request: UploadSenderKycRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "authLetter", "auth_letter");
+
+  const documents = payload["documents"];
+  if (Array.isArray(documents)) {
+    payload["documents"] = documents.map((doc) => (isRecord(doc) ? normalizeKycFile(doc) : doc));
+  }
+
+  if (isRecord(payload["auth_letter"])) {
+    payload["auth_letter"] = normalizeKycFile(payload["auth_letter"]);
+  }
+
+  return payload;
+}
+
+function normalizeCheckoutRequest(request: CheckoutRequest): Record<string, unknown> {
+  const payload = { ...request } as Record<string, unknown>;
+  renameAlias(payload, "productCode", "product_code");
   return payload;
 }
 
@@ -886,6 +1203,31 @@ function mergeSmsListQuery(
     },
     options?.query,
   );
+}
+
+function mergeWhatsAppListQuery(
+  options?: ListWhatsAppOptions & SendstackRequestOptions,
+): SendstackQueryParams | undefined {
+  return mergeQueryParams(
+    {
+      limit: options?.limit,
+      cursor: options?.cursor,
+      status: options?.status,
+    },
+    options?.query,
+  );
+}
+
+function mergeCreditsQuery(
+  options?: CreditsOptions & SendstackRequestOptions,
+): SendstackQueryParams | undefined {
+  return mergeQueryParams({ channel: options?.channel }, options?.query);
+}
+
+function mergePaymentsQuery(
+  options?: ListPaymentsOptions & SendstackRequestOptions,
+): SendstackQueryParams | undefined {
+  return mergeQueryParams({ limit: options?.limit }, options?.query);
 }
 
 function mergeTemplateListQuery(
