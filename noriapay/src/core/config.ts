@@ -46,6 +46,52 @@ export function getEnvNumber(name: string, env?: EnvLike): number | undefined {
   return parsed;
 }
 
+/**
+ * Reads a variable documented in seconds and returns milliseconds, which is the
+ * unit every option in this package takes.
+ */
+export function getEnvSecondsAsMs(name: string, env?: EnvLike): number | undefined {
+  const seconds = getEnvNumber(name, env);
+
+  return seconds === undefined ? undefined : seconds * 1000;
+}
+
+export function getEnvBoolean(name: string, env?: EnvLike): boolean | undefined {
+  const value = getOptionalEnv(name, env);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new ConfigurationError(`Environment variable ${name} must be a boolean.`);
+}
+
+/** Reads a comma-separated variable, for allowlists and similar. */
+export function getEnvList(name: string, env?: EnvLike): string[] | undefined {
+  const value = getOptionalEnv(name, env);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const entries = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+
+  return entries.length > 0 ? entries : undefined;
+}
+
 export function getEnvEnvironment(
   name: string,
   env?: EnvLike,
