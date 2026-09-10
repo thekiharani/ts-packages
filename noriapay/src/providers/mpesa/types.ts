@@ -1,13 +1,18 @@
 import type {
   AccessTokenProvider,
+  AmountNormalization,
   FetchLike,
   HttpHooks,
   JsonObject,
   NoriapayEnvironment,
   ProviderRequestOptions,
   RetryPolicy,
+  TokenStore,
 } from "../../core/types";
 import type { EnvLike } from "../../core/config";
+import type { MPESA_ENDPOINTS } from "./client";
+
+export type MpesaEndpointName = keyof typeof MPESA_ENDPOINTS;
 
 interface MpesaBaseClientOptions {
   environment?: NoriapayEnvironment;
@@ -18,6 +23,16 @@ interface MpesaBaseClientOptions {
   defaultHeaders?: HeadersInit;
   retry?: RetryPolicy | false;
   hooks?: HttpHooks;
+  /** Override individual endpoint paths, keyed by `MPESA_ENDPOINTS`. */
+  endpoints?: Partial<Record<MpesaEndpointName, string>>;
+  /** Throw `BusinessError` when Daraja reports a non-zero `ResponseCode` in a 200 body. */
+  throwOnBusinessError?: boolean;
+  amountNormalization?: AmountNormalization;
+  /** `v1` (default) or `v3`; selects the B2C payment path. */
+  b2cVersion?: MpesaB2CVersion;
+  /** Share OAuth tokens across processes. */
+  tokenStore?: TokenStore;
+  tokenCacheKey?: string;
 }
 
 interface MpesaCredentialAuthOptions {
@@ -43,6 +58,9 @@ export interface MpesaFromEnvOptions extends MpesaBaseClientOptions {
 
 export interface MpesaRequestOptions extends ProviderRequestOptions {}
 
+export type MpesaB2CVersion = "v1" | "v3";
+export type MpesaC2BRegisterVersion = "v1" | "v2";
+
 export interface MpesaApiResponse extends JsonObject {
   ConversationID?: string;
   OriginatorConversationID?: string;
@@ -51,6 +69,7 @@ export interface MpesaApiResponse extends JsonObject {
   CustomerMessage?: string;
   errorCode?: string;
   errorMessage?: string;
+  requestId?: string;
 }
 
 export interface MpesaStkPushRequest extends JsonObject {
@@ -79,6 +98,13 @@ export interface MpesaStkQueryRequest extends JsonObject {
   CheckoutRequestID: string;
 }
 
+export interface MpesaStkQueryResponse extends MpesaApiResponse {
+  MerchantRequestID?: string;
+  CheckoutRequestID?: string;
+  ResultCode?: string;
+  ResultDesc?: string;
+}
+
 export interface MpesaRegisterC2BUrlsRequest extends JsonObject {
   ShortCode: string;
   ResponseType: "Completed" | "Cancelled";
@@ -86,7 +112,13 @@ export interface MpesaRegisterC2BUrlsRequest extends JsonObject {
   ValidationURL: string;
 }
 
-export type MpesaC2BRegisterVersion = "v1" | "v2";
+export interface MpesaC2BSimulateRequest extends JsonObject {
+  ShortCode: string;
+  CommandID: "CustomerPayBillOnline" | "CustomerBuyGoodsOnline";
+  Amount: string | number;
+  Msisdn: string;
+  BillRefNumber?: string;
+}
 
 export interface MpesaB2CRequest extends JsonObject {
   InitiatorName: string;
@@ -99,17 +131,53 @@ export interface MpesaB2CRequest extends JsonObject {
   QueueTimeOutURL: string;
   ResultURL: string;
   Occasion?: string;
+  /** Required by the v3 path only. */
+  OriginatorConversationID?: string;
 }
 
 export interface MpesaB2BRequest extends JsonObject {
   Initiator: string;
   SecurityCredential: string;
-  CommandID: "BusinessBuyGoods" | "BusinessPayBill" | "B2BAccountTopUp";
+  CommandID:
+    | "BusinessBuyGoods"
+    | "BusinessPayBill"
+    | "BusinessPayToBulk"
+    | "B2BAccountTopUp"
+    | "DisburseFundsToBusiness"
+    | "BusinessToBusinessTransfer";
+  SenderIdentifierType?: string;
+  RecieverIdentifierType?: string;
   Amount: string | number;
   PartyA: string;
   PartyB: string;
   Remarks: string;
   AccountReference: string;
+  QueueTimeOutURL: string;
+  ResultURL: string;
+  Requester?: string;
+}
+
+export interface MpesaB2BExpressCheckoutRequest extends JsonObject {
+  primaryShortCode: string;
+  receiverShortCode: string;
+  amount: string | number;
+  paymentRef: string;
+  callbackUrl: string;
+  partnerName: string;
+  RequestRefID: string;
+}
+
+export interface MpesaTaxRemittanceRequest extends JsonObject {
+  Initiator: string;
+  SecurityCredential: string;
+  CommandID: "PayTaxToKRA";
+  SenderIdentifierType: string;
+  RecieverIdentifierType: string;
+  Amount: string | number;
+  PartyA: string;
+  PartyB: string;
+  AccountReference: string;
+  Remarks: string;
   QueueTimeOutURL: string;
   ResultURL: string;
 }
@@ -132,7 +200,8 @@ export interface MpesaTransactionStatusRequest extends JsonObject {
   Initiator: string;
   SecurityCredential: string;
   CommandID: "TransactionStatusQuery";
-  TransactionID: string;
+  TransactionID?: string;
+  OriginatorConversationID?: string;
   PartyA: string;
   IdentifierType: string;
   ResultURL: string;
@@ -154,7 +223,100 @@ export interface MpesaAccountBalanceRequest extends JsonObject {
 
 export interface MpesaQrCodeRequest extends JsonObject {
   MerchantName: string;
-  MerchantShortCode: string;
+  RefNo?: string;
   Amount: string | number;
-  QRType: "PAYBILL" | "BUYGOODS";
+  TrxCode?: "BG" | "WA" | "PB" | "SM" | "SB";
+  CPI?: string;
+  Size?: string;
+}
+
+export interface MpesaQrCodeResponse extends MpesaApiResponse {
+  QRCode?: string;
+  RequestID?: string;
+}
+
+export interface MpesaRatibaStandingOrderRequest extends JsonObject {
+  StandingOrderName: string;
+  StartDate: string;
+  EndDate: string;
+  BusinessShortCode: string;
+  TransactionType: "Standing Order Customer Pay Bill" | "Standing Order Customer Pay Merchant";
+  ReceiverPartyIdentifierType: "4" | "2";
+  Amount: string | number;
+  PartyA: string;
+  CallBackURL: string;
+  AccountReference: string;
+  TransactionDesc: string;
+  Frequency: string;
+}
+
+export interface MpesaPullTransactionsRegisterRequest extends JsonObject {
+  ShortCode: string;
+  RequestType: "Pull";
+  NominatedNumber: string;
+  CallBackURL: string;
+}
+
+export interface MpesaPullTransactionsRequest extends JsonObject {
+  ShortCode: string;
+  StartDate: string;
+  EndDate: string;
+  OffSetValue: string | number;
+}
+
+/**
+ * Bill Manager, and the portal-only variants of the invoicing APIs, are documented
+ * on the Daraja portal with per-merchant field sets. They are typed loosely rather
+ * than guessed at, and the escape hatches on `MpesaClient` take the same shape.
+ */
+export type MpesaBillManagerRequest = JsonObject;
+
+/** The STK result Daraja POSTs to `CallBackURL`. */
+export interface MpesaStkCallback extends JsonObject {
+  Body: {
+    stkCallback: {
+      MerchantRequestID: string;
+      CheckoutRequestID: string;
+      ResultCode: number | string;
+      ResultDesc: string;
+      CallbackMetadata?: {
+        Item: Array<{ Name: string; Value?: string | number }>;
+      };
+    };
+  };
+}
+
+/** The asynchronous result Daraja POSTs to `ResultURL` for B2C/B2B/reversal/status/balance. */
+export interface MpesaResultCallback extends JsonObject {
+  Result: {
+    ResultType: number | string;
+    ResultCode: number | string;
+    ResultDesc: string;
+    OriginatorConversationID?: string;
+    ConversationID?: string;
+    TransactionID?: string;
+    ResultParameters?: {
+      ResultParameter: Array<{ Key: string; Value?: string | number }>;
+    };
+    ReferenceData?: {
+      ReferenceItem: Array<{ Key: string; Value?: string | number }> | { Key: string; Value?: string | number };
+    };
+  };
+}
+
+/** The C2B confirmation/validation payload Daraja POSTs to a registered URL. */
+export interface MpesaC2BCallback extends JsonObject {
+  TransactionType?: string;
+  TransID: string;
+  TransTime: string;
+  TransAmount: string;
+  BusinessShortCode: string;
+  BillRefNumber?: string;
+  InvoiceNumber?: string;
+  OrgAccountBalance?: string;
+  ThirdPartyTransID?: string;
+  MSISDN: string;
+  FirstName?: string;
+  MiddleName?: string;
+  LastName?: string;
 }

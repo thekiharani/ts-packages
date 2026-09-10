@@ -1,254 +1,163 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { PAYSTACK_BASE_URL, PaystackClient } from "../dist/paystack.js";
+import { BusinessError, ConfigurationError } from "../dist/index.js";
+import { PAYSTACK_BASE_URL, PAYSTACK_ENDPOINTS, PaystackClient } from "../dist/paystack.js";
+import { json, mockFetch } from "./helpers.mjs";
 
-test("PaystackClient requires a secret key", () => {
-  assert.throws(() => new PaystackClient({ secretKey: "" }), /requires secretKey/i);
+function client(routes, options = {}) {
+  const fetch = mockFetch(routes);
+  return { fetch, client: new PaystackClient({ secretKey: "sk_test_123", fetch, ...options }) };
+}
+
+test("a secret key or token provider is required", () => {
+  assert.throws(() => new PaystackClient({}), ConfigurationError);
+  assert.doesNotThrow(
+    () => new PaystackClient({ tokenProvider: { getAccessToken: async () => "sk" } }),
+  );
 });
 
-test("PaystackClient supports initialize, verify, bank, recipient, and transfer flows", async () => {
-  const calls = [];
-  const fetch = async (input, init = {}) => {
-    const url = typeof input === "string" ? input : input.toString();
-    const headers = new Headers(init.headers);
-    calls.push({ url, init: { ...init, headers } });
+test("initializeTransaction posts with the secret key as the bearer", async () => {
+  const { fetch, client: paystack } = client([
+    [
+      "/transaction/initialize",
+      () => json({ status: true, data: { authorization_url: "https://checkout.test/x" } }),
+    ],
+  ]);
 
-    if (url.endsWith("/transaction/initialize")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Authorization URL created",
-          data: {
-            authorization_url: "https://checkout.paystack.com/test",
-            access_code: "ACCESS_test",
-            reference: "ref-init",
-          },
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+  const response = await paystack.initializeTransaction({
+    amount: 500000,
+    email: "customer@example.test",
+  });
 
-    if (url.endsWith("/transaction/verify/ref-init")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Verification successful",
-          data: {
-            id: 123,
-            status: "success",
-            reference: "ref-init",
-            amount: 5000,
-            currency: "KES",
-          },
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+  assert.equal(response.data.authorization_url, "https://checkout.test/x");
+  assert.equal(fetch.last().url, `${PAYSTACK_BASE_URL}/transaction/initialize`);
+  assert.equal(fetch.last().headers.get("authorization"), "Bearer sk_test_123");
+  assert.equal(fetch.last().method, "POST");
+});
 
-    if (url.includes("/bank?")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Banks retrieved",
-          data: [
-            {
-              name: "Safaricom",
-              code: "MPESA",
-              country: "Kenya",
-              currency: "KES",
-              type: "mobile_money",
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+test("path parameters are URL-encoded", async () => {
+  const { fetch, client: paystack } = client([["/transaction/verify", () => json({ status: true })]]);
 
-    if (url.includes("/bank/resolve?")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Account number resolved",
-          data: {
-            account_number: "247247",
-            account_name: "Till Transfer Example",
-          },
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+  await paystack.verifyTransaction("ref/with spaces");
+  assert.equal(fetch.last().url, `${PAYSTACK_BASE_URL}/transaction/verify/ref%2Fwith%20spaces`);
+});
 
-    if (url.endsWith("/transferrecipient")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Transfer recipient created successfully",
-          data: {
-            recipient_code: "RCP_paystack",
-            type: "mobile_money_business",
-            currency: "KES",
-            details: {
-              account_number: "247247",
-              bank_code: "MPTILL",
-            },
-          },
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+test("throwOnBusinessError catches a 200 with status false", async () => {
+  const failed = { status: false, message: "Invalid split code" };
 
-    if (url.endsWith("/transfer")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Transfer has been queued",
-          data: {
-            transfer_code: "TRF_queued",
-            status: "otp",
-            reference: "ref-transfer",
-            amount: 5000,
-            currency: "KES",
-          },
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+  const { client: quiet } = client([["/transaction/initialize", () => json(failed)]]);
+  assert.deepEqual(await quiet.initializeTransaction({}), failed);
 
-    if (url.endsWith("/transfer/finalize_transfer")) {
-      return new Response(
-        JSON.stringify({
-          status: true,
-          message: "Transfer finalized",
-          data: {
-            transfer_code: "TRF_queued",
-            status: "success",
-            reference: "ref-transfer",
-          },
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
+  const { client: loud } = client([["/transaction/initialize", () => json(failed)]], {
+    throwOnBusinessError: true,
+  });
 
-    return new Response(
-      JSON.stringify({
-        status: true,
-        message: "Transfer retrieved",
-        data: {
-          transfer_code: "TRF_queued",
-          status: "success",
-          reference: "ref-transfer",
-        },
-      }),
-      {
-        status: 200,
-        headers: { "content-type": "application/json" },
+  await assert.rejects(
+    () => loud.initializeTransaction({}),
+    (error) => {
+      assert.ok(error instanceof BusinessError);
+      assert.equal(error.provider, "paystack");
+      assert.match(error.message, /Invalid split code/);
+      return true;
+    },
+  );
+});
+
+test("every wrapped endpoint calls the method and path Paystack documents", async () => {
+  const seen = [];
+  const fetch = mockFetch([
+    [
+      "api.paystack.co",
+      (ctx) => {
+        seen.push([ctx.init.method, new URL(ctx.url).pathname]);
+        return json({ status: true });
       },
+    ],
+  ]);
+  const paystack = new PaystackClient({ secretKey: "sk", fetch });
+
+  for (const [name, [method, template]] of Object.entries(PAYSTACK_ENDPOINTS)) {
+    const parameters = [...template.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
+    const args = parameters.map((parameter) => `sample-${parameter}`);
+    // Every method takes an optional body or query object after its path parameters.
+    args.push({});
+
+    seen.length = 0;
+    await paystack[name](...args);
+
+    assert.equal(seen.length, 1, `${name} made ${seen.length} requests`);
+
+    const expectedPath = parameters.reduce(
+      (path, parameter) => path.replace(`{${parameter}}`, `sample-${parameter}`),
+      template,
     );
-  };
 
-  const client = new PaystackClient({
-    secretKey: "sk_test_123",
-    fetch,
-    defaultHeaders: { "x-client-header": "client" },
-    hooks: {
-      beforeRequest(context) {
-        context.headers.set("x-hooked", "yes");
-      },
+    assert.deepEqual(seen[0], [method, expectedPath], `${name} did not match its endpoint entry`);
+  }
+});
+
+test("list endpoints send their filters as a query string", async () => {
+  const { fetch, client: paystack } = client([["api.paystack.co", () => json({ status: true })]]);
+
+  await paystack.listTransactions({ perPage: 50, page: 2, status: "success" });
+  const url = new URL(fetch.last().url);
+  assert.equal(url.pathname, "/transaction");
+  assert.equal(url.searchParams.get("perPage"), "50");
+  assert.equal(url.searchParams.get("status"), "success");
+  assert.equal(fetch.last().method, "GET");
+});
+
+test("the escape hatches cover every verb", async () => {
+  const { fetch, client: paystack } = client([["api.paystack.co", () => json({ status: true })]]);
+
+  await paystack.authorizedPost("/some/new/endpoint", { a: 1 });
+  assert.equal(fetch.last().method, "POST");
+  assert.deepEqual(fetch.jsonBody(), { a: 1 });
+
+  await paystack.authorizedGet("/some/new/endpoint", { page: 1 });
+  assert.equal(fetch.last().method, "GET");
+
+  await paystack.authorizedPut("/some/new/endpoint", { a: 1 });
+  assert.equal(fetch.last().method, "PUT");
+
+  await paystack.authorizedDelete("/some/new/endpoint");
+  assert.equal(fetch.last().method, "DELETE");
+
+  assert.equal(fetch.last().headers.get("authorization"), "Bearer sk_test_123");
+});
+
+test("an endpoint override can change a path or a whole method and path pair", async () => {
+  const { fetch, client: paystack } = client([["api.paystack.co", () => json({ status: true })]], {
+    endpoints: {
+      listBanks: "/bank/v2",
+      verifyTransaction: ["POST", "/transaction/verify/{reference}"],
     },
   });
 
-  assert.equal(PAYSTACK_BASE_URL, "https://api.paystack.co");
-  assert.equal(
-    (await client.initializeTransaction({
-      amount: 5000,
-      email: "customer@example.com",
-      currency: "KES",
-      reference: "ref-init",
-    })).data.reference,
-    "ref-init",
-  );
-  assert.equal((await client.verifyTransaction("ref-init")).data.status, "success");
-  assert.equal(
-    (await client.listBanks({ currency: "KES", type: "mobile_money" })).data[0].code,
-    "MPESA",
-  );
-  assert.equal(
-    (await client.resolveAccount({ accountNumber: "247247", bankCode: "MPTILL" })).data.account_name,
-    "Till Transfer Example",
-  );
-  assert.equal(
-    (
-      await client.createTransferRecipient({
-        type: "mobile_money_business",
-        name: "Till Transfer Example",
-        account_number: "247247",
-        bank_code: "MPTILL",
-        currency: "KES",
-      })
-    ).data.recipient_code,
-    "RCP_paystack",
-  );
-  assert.equal(
-    (
-      await client.initiateTransfer({
-        source: "balance",
-        amount: 5000,
-        recipient: "RCP_paystack",
-        reference: "ref-transfer",
-        currency: "KES",
-        account_reference: "ACC-123",
-      })
-    ).data.status,
-    "otp",
-  );
-  assert.equal(
-    (
-      await client.finalizeTransfer(
-        {
-          transfer_code: "TRF_queued",
-          otp: "123456",
-        },
-        {
-          accessToken: "sk_test_override",
-          headers: { "x-request-id": "req-123" },
-        },
-      )
-    ).data.status,
-    "success",
-  );
-  assert.equal((await client.verifyTransfer("ref-transfer")).data.reference, "ref-transfer");
+  await paystack.listBanks();
+  assert.equal(new URL(fetch.last().url).pathname, "/bank/v2");
+  assert.equal(fetch.last().method, "GET", "an override path keeps the documented verb");
 
-  assert.equal(calls[0].init.headers.get("authorization"), "Bearer sk_test_123");
-  assert.equal(calls[0].init.headers.get("x-client-header"), "client");
-  assert.equal(calls[0].init.headers.get("x-hooked"), "yes");
-  assert.equal(JSON.parse(calls[0].init.body).email, "customer@example.com");
-  assert.match(calls[1].url, /\/transaction\/verify\/ref-init$/);
-  assert.match(calls[2].url, /currency=KES/);
-  assert.match(calls[2].url, /type=mobile_money/);
-  assert.match(calls[3].url, /account_number=247247/);
-  assert.match(calls[3].url, /bank_code=MPTILL/);
-  assert.equal(calls[6].init.headers.get("authorization"), "Bearer sk_test_override");
-  assert.equal(calls[6].init.headers.get("x-request-id"), "req-123");
+  await paystack.verifyTransaction("ref");
+  assert.equal(fetch.last().method, "POST");
+
+  assert.deepEqual(paystack.endpoint("listBanks"), ["GET", "/bank/v2"]);
+  assert.deepEqual(paystack.endpoint("createRefund"), PAYSTACK_ENDPOINTS.createRefund);
+});
+
+test("the public key is carried for the front end and never sent", async () => {
+  const { fetch, client: paystack } = client([["api.paystack.co", () => json({ status: true })]], {
+    publicKey: "pk_test_456",
+  });
+
+  assert.equal(paystack.publicKey, "pk_test_456");
+  await paystack.listBanks();
+  assert.equal(fetch.last().headers.get("authorization"), "Bearer sk_test_123");
+});
+
+test("static helpers read a business outcome", () => {
+  assert.equal(PaystackClient.succeeded({ status: true }), true);
+  assert.equal(PaystackClient.succeeded({ status: false }), false);
+  assert.equal(PaystackClient.statusMessage({ message: "Declined" }), "Declined");
 });
