@@ -1,11 +1,31 @@
 import type { EnvLike } from "../../core/config";
 import type {
+  AccessTokenProvider,
   FetchLike,
   HttpHooks,
   JsonObject,
   ProviderRequestOptions,
+  QueryParams,
   RetryPolicy,
 } from "../../core/types";
+import type { PAYSTACK_ENDPOINTS } from "./client";
+
+export type PaystackEndpointName = keyof typeof PAYSTACK_ENDPOINTS;
+export type PaystackHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** A request body for an endpoint this package does not model field-by-field. */
+export type PaystackPayload = JsonObject;
+
+/**
+ * Query parameters for a list endpoint. Paystack pages every list with
+ * `perPage` and `page`, and most add their own filters.
+ */
+export interface PaystackQuery extends QueryParams {
+  perPage?: number;
+  page?: number;
+  from?: string;
+  to?: string;
+}
 
 interface PaystackBaseClientOptions {
   baseUrl?: string;
@@ -14,18 +34,29 @@ interface PaystackBaseClientOptions {
   defaultHeaders?: HeadersInit;
   retry?: RetryPolicy | false;
   hooks?: HttpHooks;
+  /** Override endpoint paths, or whole `[method, path]` pairs, keyed by `PAYSTACK_ENDPOINTS`. */
+  endpoints?: Partial<
+    Record<PaystackEndpointName, string | readonly [PaystackHttpMethod, string]>
+  >;
+  /** Throw `BusinessError` when Paystack answers 200 with `status: false`. */
+  throwOnBusinessError?: boolean;
+  /** Publishable key, carried for convenience and never sent by this client. */
+  publicKey?: string;
+  tokenProvider?: AccessTokenProvider;
 }
 
 export interface PaystackClientOptions extends PaystackBaseClientOptions {
-  secretKey: string;
+  secretKey?: string;
 }
 
 export interface PaystackFromEnvOptions extends PaystackBaseClientOptions {
   prefix?: string;
   env?: EnvLike;
+  secretKey?: string;
 }
 
 export interface PaystackRequestOptions extends ProviderRequestOptions {}
+
 
 export type PaystackBearer = "account" | "subaccount";
 export type PaystackPaymentChannel =

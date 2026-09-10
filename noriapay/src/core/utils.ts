@@ -1,5 +1,5 @@
 import { ConfigurationError } from "./errors";
-import type { FetchLike } from "./types";
+import type { AmountNormalization, FetchLike, QueryParams } from "./types";
 
 export function getFetch(override?: FetchLike): FetchLike {
   if (override) {
@@ -27,10 +27,7 @@ export function appendPath(baseUrl: string, path: string): string {
   return `${normalizedBase}${normalizedPath}`;
 }
 
-export function appendQuery(
-  input: string,
-  query?: Record<string, string | number | boolean | null | undefined>,
-): string {
+export function appendQuery(input: string, query?: QueryParams): string {
   if (!query) {
     return input;
   }
@@ -51,19 +48,140 @@ export function appendQuery(
 export function encodeBasicAuth(username: string, password: string): string {
   const raw = `${username}:${password}`;
 
-  if (typeof globalThis.btoa === "function") {
-    return globalThis.btoa(raw);
-  }
-
   if (typeof Buffer !== "undefined") {
     return Buffer.from(raw, "utf8").toString("base64");
+  }
+
+  if (typeof globalThis.btoa === "function") {
+    // btoa is latin1-only; credentials outside it would be silently corrupted.
+    if (/^[\x00-\xFF]*$/.test(raw)) {
+      return globalThis.btoa(raw);
+    }
+
+    throw new ConfigurationError(
+      "Credentials contain characters this runtime's base64 encoder cannot represent.",
+    );
   }
 
   throw new ConfigurationError("No base64 encoder is available in this runtime.");
 }
 
+/**
+ * Renders an amount the way payment providers expect to read it.
+ *
+ * A plain `String(value)` leaks binary rounding artefacts — `0.1 + 0.2` becomes
+ * `"0.30000000000000004"` — and switches to exponent notation above 1e21, both of
+ * which providers reject. Values are rounded to 8 decimal places and trailing
+ * zeros removed, so `100.50` sends as `"100.5"` and `1000` as `"1000"`.
+ */
+export function amountToString(value: string | number | boolean): string {
+  if (typeof value === "boolean") {
+    return value ? "1" : "0";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!Number.isFinite(value)) {
+    return String(value);
+  }
+
+  const text = Math.abs(value) < 1e21 ? value.toFixed(8) : expandExponential(value);
+
+  return trimFractionalZeros(text);
+}
+
 export function toAmountString(value: string | number): string {
-  return typeof value === "number" ? value.toString() : value;
+  return amountToString(value);
+}
+
+/**
+ * Rewrites `Amount`/`amount` in place, honouring the `"none"` opt-out.
+ *
+ * Arrays pass through untouched. Spreading one would turn a bulk-invoice list
+ * into `{"0":…}`, which the provider rejects, and the bulk endpoints legitimately
+ * send arrays.
+ */
+export function normalizeAmount<T extends object>(
+  payload: T,
+  normalization: AmountNormalization = "string",
+): T {
+  if (normalization === "none" || Array.isArray(payload)) {
+    return payload;
+  }
+
+  const normalized = { ...payload } as Record<string, unknown>;
+
+  for (const key of ["Amount", "amount"]) {
+    const value = normalized[key];
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      normalized[key] = amountToString(value);
+    }
+  }
+
+  return normalized as T;
+}
+
+export function resolveAmountNormalization(value?: string | null): AmountNormalization {
+  const normalized = (value ?? "string").trim().toLowerCase();
+
+  return normalized === "none" || normalized === "raw" || normalized === "preserve"
+    ? "none"
+    : "string";
+}
+
+/**
+ * Rewrites a Kenyan mobile number into the `2547XXXXXXXX` / `2541XXXXXXXX` form
+ * every provider here requires. Anything that is not recognisably a Kenyan
+ * number is returned untouched rather than mangled.
+ */
+export function normalizeKenyanPhoneNumber<T extends string | number>(value: T): T | string {
+  const raw = String(value);
+
+  if (!/^[\d\s()+-]+$/.test(raw)) {
+    return value;
+  }
+
+  const digits = raw.replace(/\D/g, "");
+
+  const leadingZero = /^0([17]\d{8})$/.exec(digits);
+  if (leadingZero) {
+    return `254${leadingZero[1]}`;
+  }
+
+  if (/^[17]\d{8}$/.test(digits)) {
+    return `254${digits}`;
+  }
+
+  if (/^254[17]\d{8}$/.test(digits)) {
+    return digits;
+  }
+
+  return value;
+}
+
+export function normalizeKenyanPhoneNumbers<T extends object>(payload: T, keys: string[]): T {
+  const normalized = { ...payload } as Record<string, unknown>;
+  let touched = false;
+
+  for (const key of keys) {
+    const value = normalized[key];
+
+    if (typeof value !== "string" && typeof value !== "number") {
+      continue;
+    }
+
+    const next = normalizeKenyanPhoneNumber(value);
+
+    if (next !== value) {
+      normalized[key] = next;
+      touched = true;
+    }
+  }
+
+  return touched ? (normalized as T) : payload;
 }
 
 export function toJsonObject(value: unknown): Record<string, unknown> {
@@ -74,13 +192,232 @@ export function toJsonObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-export function formatTimestamp(date: Date = new Date()): string {
-  const year = date.getFullYear().toString().padStart(4, "0");
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const day = date.getDate().toString().padStart(2, "0");
-  const hours = date.getHours().toString().padStart(2, "0");
-  const minutes = date.getMinutes().toString().padStart(2, "0");
-  const seconds = date.getSeconds().toString().padStart(2, "0");
+/**
+ * Formats a timestamp in `YYYYMMDDHHMMSS`, in `timeZone` (default `Africa/Nairobi`).
+ *
+ * The default is not cosmetic: Daraja validates the STK password against a
+ * timestamp in East Africa Time, so a container running in UTC would otherwise
+ * produce a password three hours out and every push would be rejected.
+ */
+export function formatTimestamp(date: Date = new Date(), timeZone = "Africa/Nairobi"): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
 
-  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+  const lookup: Record<string, string> = {};
+  for (const part of parts) {
+    lookup[part.type] = part.value;
+  }
+
+  // Intl renders midnight as hour "24" in some ICU versions.
+  const hour = lookup["hour"] === "24" ? "00" : (lookup["hour"] ?? "00");
+
+  return [
+    (lookup["year"] ?? "0000").padStart(4, "0"),
+    lookup["month"] ?? "01",
+    lookup["day"] ?? "01",
+    hour,
+    lookup["minute"] ?? "00",
+    lookup["second"] ?? "00",
+  ].join("");
+}
+
+/**
+ * Matches an address against an exact IP, a CIDR block, or `*`.
+ *
+ * Provider allowlists are published as bare addresses today, but operators
+ * routinely need to widen one to a range in front of a load balancer, and an
+ * exact string compare silently never matches a CIDR entry.
+ */
+export function ipMatches(ip: string, pattern: string): boolean {
+  const address = ip.trim();
+  const rule = pattern.trim();
+
+  if (address === "" || rule === "") {
+    return false;
+  }
+
+  if (rule === "*" || rule === "0.0.0.0/0" || rule === "::/0") {
+    return true;
+  }
+
+  const [network, prefixText] = rule.split("/", 2);
+  const candidate = parseIp(address);
+  const target = parseIp(network ?? "");
+
+  if (!candidate || !target || candidate.length !== target.length) {
+    return false;
+  }
+
+  const maxPrefix = candidate.length * 8;
+  const prefix = prefixText === undefined ? maxPrefix : Number(prefixText);
+
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) {
+    return false;
+  }
+
+  const fullBytes = prefix >> 3;
+
+  for (let index = 0; index < fullBytes; index += 1) {
+    if (candidate[index] !== target[index]) {
+      return false;
+    }
+  }
+
+  const remainingBits = prefix & 7;
+
+  if (remainingBits === 0) {
+    return true;
+  }
+
+  const mask = 0xff << (8 - remainingBits) & 0xff;
+
+  return ((candidate[fullBytes] ?? 0) & mask) === ((target[fullBytes] ?? 0) & mask);
+}
+
+export function ipInList(ip: string | null | undefined, patterns: Iterable<string>): boolean {
+  if (!ip || ip.trim() === "") {
+    return false;
+  }
+
+  for (const pattern of patterns) {
+    if (ipMatches(ip, pattern)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Normalizes an IP to its bytes: 4 for IPv4, 16 for IPv6. Returns undefined if unparseable. */
+function parseIp(value: string): number[] | undefined {
+  const text = value.trim();
+
+  if (text.includes(":")) {
+    return parseIpv6(text);
+  }
+
+  return parseIpv4(text);
+}
+
+function parseIpv4(value: string): number[] | undefined {
+  const parts = value.split(".");
+
+  if (parts.length !== 4) {
+    return undefined;
+  }
+
+  const bytes: number[] = [];
+
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) {
+      return undefined;
+    }
+
+    const byte = Number(part);
+
+    if (byte > 255) {
+      return undefined;
+    }
+
+    bytes.push(byte);
+  }
+
+  return bytes;
+}
+
+function parseIpv6(value: string): number[] | undefined {
+  let text = value;
+  let tail: number[] = [];
+
+  // A trailing dotted quad, as in `::ffff:192.0.2.1`.
+  const dotted = text.lastIndexOf(":");
+  const maybeIpv4 = text.slice(dotted + 1);
+
+  if (maybeIpv4.includes(".")) {
+    const parsed = parseIpv4(maybeIpv4);
+
+    if (!parsed) {
+      return undefined;
+    }
+
+    tail = parsed;
+    text = text.slice(0, dotted + 1) + "0:0";
+  }
+
+  const halves = text.split("::");
+
+  if (halves.length > 2) {
+    return undefined;
+  }
+
+  const head = halves[0] === "" ? [] : (halves[0] ?? "").split(":");
+  const rest = halves.length === 2 ? (halves[1] === "" ? [] : (halves[1] ?? "").split(":")) : [];
+
+  const groups: string[] =
+    halves.length === 2
+      ? [...head, ...Array(Math.max(0, 8 - head.length - rest.length)).fill("0"), ...rest]
+      : head;
+
+  if (groups.length !== 8) {
+    return undefined;
+  }
+
+  const bytes: number[] = [];
+
+  for (const group of groups) {
+    if (!/^[0-9a-f]{1,4}$/i.test(group)) {
+      return undefined;
+    }
+
+    const word = Number.parseInt(group, 16);
+    bytes.push((word >> 8) & 0xff, word & 0xff);
+  }
+
+  if (tail.length === 4) {
+    bytes.splice(12, 4, ...tail);
+  }
+
+  return bytes;
+}
+
+function expandExponential(value: number): string {
+  const text = value.toString();
+  const match = /^(-?)(\d+)(?:\.(\d+))?e([+-]?\d+)$/i.exec(text);
+
+  if (!match) {
+    return text;
+  }
+
+  const sign = match[1] ?? "";
+  const intPart = match[2] ?? "0";
+  const fracPart = match[3] ?? "";
+  const exponent = Number(match[4]);
+  const digits = intPart + fracPart;
+  const pointPosition = intPart.length + exponent;
+
+  if (pointPosition <= 0) {
+    return `${sign}0.${"0".repeat(-pointPosition)}${digits}`;
+  }
+
+  if (pointPosition >= digits.length) {
+    return `${sign}${digits}${"0".repeat(pointPosition - digits.length)}`;
+  }
+
+  return `${sign}${digits.slice(0, pointPosition)}.${digits.slice(pointPosition)}`;
+}
+
+function trimFractionalZeros(value: string): string {
+  if (!value.includes(".")) {
+    return value;
+  }
+
+  return value.replace(/0+$/, "").replace(/\.$/, "");
 }
