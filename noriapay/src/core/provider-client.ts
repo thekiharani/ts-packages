@@ -22,10 +22,8 @@ export interface ProviderClientConfig {
   defaultHeaders?: HeadersInit;
   retry?: RetryPolicy | false;
   hooks?: HttpHooks;
-  /** Throw `BusinessError` when the provider reports failure in a 200 body. */
   throwOnBusinessError?: boolean;
   amountNormalization?: AmountNormalization;
-  /** Run published field rules before sending. Defaults to true where rules exist. */
   validate?: boolean;
 }
 
@@ -36,18 +34,9 @@ export interface SendInput {
   query?: QueryParams;
   multipart?: MultipartInput;
   options?: ProviderRequestOptions;
-  /** Label used in a `BusinessError` message. Omit to skip the business check. */
   businessContext?: string;
 }
 
-/**
- * Shared plumbing for every provider client: token resolution, auth headers,
- * business-status enforcement, and the raw `authorized*` escape hatches.
- *
- * The escape hatches matter as much as the generated methods. No SDK tracks a
- * payment API perfectly, and a caller who needs an endpoint this package has not
- * wrapped should reach for `authorizedPost()` rather than abandoning the client.
- */
 export abstract class ProviderClient {
   protected readonly http: HttpClient;
   protected readonly tokens: AccessTokenProvider;
@@ -73,12 +62,10 @@ export abstract class ProviderClient {
     this.validatePayloads = config.validate ?? true;
   }
 
-  /** Resolves an access token, honouring a per-request override. */
   async getAccessToken(forceRefresh = false): Promise<string> {
     return this.tokens.getAccessToken(forceRefresh);
   }
 
-  /** Sends an authenticated POST to a path this package does not wrap. */
   async authorizedPost<T = unknown>(
     path: string,
     body?: unknown,
@@ -87,7 +74,6 @@ export abstract class ProviderClient {
     return this.send<T>({ path, method: "POST", body, options });
   }
 
-  /** Sends an authenticated GET to a path this package does not wrap. */
   async authorizedGet<T = unknown>(
     path: string,
     query?: QueryParams,
@@ -121,7 +107,6 @@ export abstract class ProviderClient {
     return this.send<T>({ path, method: "DELETE", body, query, options });
   }
 
-  /** Sends an authenticated multipart POST to a path this package does not wrap. */
   async authorizedMultipartPost<T = unknown>(
     path: string,
     multipart: MultipartInput,
@@ -175,7 +160,6 @@ export abstract class ProviderClient {
   }
 }
 
-/** Merges caller-supplied endpoint overrides over a provider's defaults. */
 export function resolveEndpoints<T extends Record<string, string>>(
   defaults: T,
   overrides?: Partial<Record<keyof T, string>>,
@@ -195,13 +179,6 @@ export function resolveEndpoints<T extends Record<string, string>>(
   return resolved;
 }
 
-/**
- * Substitutes `{placeholder}` segments, URL-encoding each value.
- *
- * Names listed in `raw` are substituted verbatim. That is for the wildcard
- * resources — Buni's eTIMS and P2P gateways — whose placeholder stands in for a
- * whole path fragment, where encoding the separators would break the route.
- */
 export function fillPath(
   template: string,
   replacements: Record<string, string | number>,
@@ -228,7 +205,6 @@ export function fillPath(
   return path;
 }
 
-/** Fills keys the caller left out, without overwriting anything they supplied. */
 export function withDefaults<T extends object>(
   payload: T,
   defaults: Record<string, string | number | undefined>,

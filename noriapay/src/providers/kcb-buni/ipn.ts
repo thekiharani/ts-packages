@@ -12,16 +12,6 @@ import type {
 
 type RawBody = string | ArrayBuffer | ArrayBufferView;
 
-/**
- * Verifies the `Signature` header KCB sends with an Instant Payment Notification:
- * an RSA-SHA256 signature over the exact raw request body, base64 encoded.
- *
- * The body must be the bytes as received. Re-serializing a parsed object changes
- * key order and whitespace, and the signature will not match.
- *
- * `/validation` requests are unsigned, and the M-PESA Express `callbackUrl` result
- * is not an IPN at all — neither carries a signature to check.
- */
 export function verifyKcbBuniIpnSignature(
   rawBody: RawBody,
   signature: string | null | undefined,
@@ -49,17 +39,14 @@ export function verifyKcbBuniIpnSignature(
 
     return verifier.verify(key, signature.trim(), "base64");
   } catch {
-    // A malformed signature is a failed verification, not a crash.
     return false;
   }
 }
 
 export interface KcbBuniIpnVerificationOptions {
   publicKey?: string | KeyObject;
-  /** Exact addresses or CIDR blocks. KCB issues these per integration. */
   trustedIps?: string[];
   enforceIpAllowlist?: boolean;
-  /** Set false only for the unsigned `/validation` route. */
   verifySignature?: boolean;
 }
 
@@ -99,7 +86,6 @@ export function requireKcbBuniIpn(
   }
 }
 
-/** Tells the three inbound Buni contracts apart by their envelope shape. */
 export function detectKcbBuniIpnKind(payload: unknown): KcbBuniIpnKind | undefined {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return undefined;
@@ -122,7 +108,6 @@ export function detectKcbBuniIpnKind(payload: unknown): KcbBuniIpnKind | undefin
   return undefined;
 }
 
-/** The payment fields of a till notification, from under its two envelope layers. */
 export function kcbBuniTillNotificationData(
   payload: KcbBuniTillNotification,
 ): KcbBuniTillNotification["requestPayload"]["additionalData"]["notificationData"] | undefined {
@@ -135,7 +120,6 @@ export function kcbBuniTillPrimaryData(
   return payload.requestPayload?.primaryData;
 }
 
-/** The response body a till notification expects, echoing the inbound message IDs. */
 export function kcbBuniTillAcknowledgement(
   payload: Pick<KcbBuniTillNotification, "header">,
   transactionId: string,
@@ -157,7 +141,6 @@ export function kcbBuniTillAcknowledgement(
   };
 }
 
-/** The response body an account notification expects. */
 export function kcbBuniAccountAcknowledgement(
   transactionId: string,
   statusCode = "0",
@@ -170,10 +153,6 @@ export function kcbBuniAccountAcknowledgement(
   };
 }
 
-/**
- * The response to `/validation`: an acknowledgement plus whatever bill details the
- * integration is configured to return to the paying customer.
- */
 export function kcbBuniValidationResponse(
   transactionId: string,
   bill: Partial<{
@@ -205,7 +184,6 @@ export function kcbBuniValidationResponse(
   return response;
 }
 
-/** Rejects an inbound notification in whichever envelope shape it arrived in. */
 export function kcbBuniRejection(
   payload: unknown,
   statusCode: string,

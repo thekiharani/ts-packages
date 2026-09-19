@@ -15,10 +15,8 @@ import type { SASAPAY_ENDPOINTS, SASAPAY_WAAS_ENDPOINTS } from "./client";
 export type SasaPayEndpointName = keyof typeof SASAPAY_ENDPOINTS;
 export type SasaPayWaasEndpointName = keyof typeof SASAPAY_WAAS_ENDPOINTS;
 
-/** A request body for an endpoint this package does not model field-by-field. */
 export type SasaPayPayload = JsonObject;
 
-/** Every SasaPay response carries `status` and `detail`; the rest varies by endpoint. */
 export interface SasaPayResponse extends JsonObject {
   status?: boolean;
   detail?: string;
@@ -30,7 +28,6 @@ export interface SasaPayResponse extends JsonObject {
 interface SasaPayBaseClientOptions {
   environment?: NoriapayEnvironment;
   baseUrl?: string;
-  /** WaaS runs on its own host; defaults to the v2 host for `environment`. */
   waasBaseUrl?: string;
   tokenUrl?: string;
   waasTokenUrl?: string;
@@ -40,22 +37,13 @@ interface SasaPayBaseClientOptions {
   defaultHeaders?: HeadersInit;
   retry?: RetryPolicy | false;
   hooks?: HttpHooks;
-  /** Override v1 endpoint paths, keyed by `SASAPAY_ENDPOINTS`. */
   endpoints?: Partial<Record<SasaPayEndpointName, string>>;
-  /** Override WaaS endpoint paths, keyed by `SASAPAY_WAAS_ENDPOINTS`. */
   waasEndpoints?: Partial<Record<SasaPayWaasEndpointName, string>>;
-  /** Throw `BusinessError` when SasaPay answers 200 with `status: false`. */
   throwOnBusinessError?: boolean;
   amountNormalization?: AmountNormalization;
   tokenStore?: TokenStore;
-  /**
-   * Filled into every v1 payment payload the caller leaves out — typically
-   * `MerchantCode`, `Currency` and `CallBackURL`, which are the same on every call.
-   */
   paymentDefaults?: Record<string, string | undefined>;
-  /** The WaaS equivalent: `merchantCode`, `currencyCode`, `callbackUrl`. */
   waasPaymentDefaults?: Record<string, string | undefined>;
-  /** WaaS credentials, when SasaPay issued a separate application for it. */
   waasClientId?: string;
   waasClientSecret?: string;
 }
@@ -82,7 +70,6 @@ export interface SasaPayFromEnvOptions extends SasaPayBaseClientOptions {
 }
 
 export interface SasaPayRequestOptions extends ProviderRequestOptions {}
-
 
 export interface SasaPayAuthResponse extends JsonObject {
   status?: boolean;

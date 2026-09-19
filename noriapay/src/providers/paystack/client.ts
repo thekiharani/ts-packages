@@ -39,12 +39,6 @@ import type {
 
 export const PAYSTACK_BASE_URL = "https://api.paystack.co";
 
-/**
- * Every Paystack endpoint this client wraps, as `[method, path]`.
- *
- * Exported so callers can override a path when Paystack ships a change ahead of
- * this package, and so `endpoint()` can report what a method will actually call.
- */
 export const PAYSTACK_ENDPOINTS = {
   initializeTransaction: ["POST", "/transaction/initialize"],
   chargeAuthorization: ["POST", "/transaction/charge_authorization"],
@@ -249,7 +243,6 @@ export class PaystackClient extends ProviderClient {
     return businessStatusMessage("paystack", response);
   }
 
-  /** The publishable key, for handing to Paystack Inline on the front end. */
   readonly publicKey?: string;
 
   private readonly endpointMap: Record<PaystackEndpointName, readonly [PaystackHttpMethod, string]>;
@@ -275,12 +268,10 @@ export class PaystackClient extends ProviderClient {
     this.endpointMap = resolvePaystackEndpoints(options.endpoints);
   }
 
-  /** The resolved `[method, path]` for an endpoint, after any constructor overrides. */
   endpoint(name: PaystackEndpointName): readonly [PaystackHttpMethod, string] {
     return this.endpointMap[name];
   }
 
-  /** Starts a checkout and returns the `authorization_url` to redirect the customer to. */
   async initializeTransaction(
     request: PaystackInitializeTransactionRequest,
     options?: PaystackRequestOptions,

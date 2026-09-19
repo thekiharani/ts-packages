@@ -46,10 +46,6 @@ export function getEnvNumber(name: string, env?: EnvLike): number | undefined {
   return parsed;
 }
 
-/**
- * Reads a variable documented in seconds and returns milliseconds, which is the
- * unit every option in this package takes.
- */
 export function getEnvSecondsAsMs(name: string, env?: EnvLike): number | undefined {
   const seconds = getEnvNumber(name, env);
 
@@ -76,7 +72,6 @@ export function getEnvBoolean(name: string, env?: EnvLike): boolean | undefined 
   throw new ConfigurationError(`Environment variable ${name} must be a boolean.`);
 }
 
-/** Reads a comma-separated variable, for allowlists and similar. */
 export function getEnvList(name: string, env?: EnvLike): string[] | undefined {
   const value = getOptionalEnv(name, env);
 

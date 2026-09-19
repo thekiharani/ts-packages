@@ -9,8 +9,6 @@ import { KcbBuniClient } from "../dist/kcb-buni.js";
 import { json, mockFetch, oauthRoute, tokenRoute } from "./helpers.mjs";
 
 test("TIMEOUT_SECONDS is read as seconds and applied as milliseconds", async () => {
-  // A 60 ms response under a 30 second budget must succeed. Reading the variable
-  // as milliseconds would abort it after 30 ms.
   const slow = (url, init = {}) =>
     new Promise((resolve, reject) => {
       const handle = setTimeout(

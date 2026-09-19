@@ -50,10 +50,6 @@ test("requestPayment authenticates at the documented token URL and normalizes th
 });
 
 test("token URLs match SasaPay's published authentication endpoints", async () => {
-  // https://developer.sasapay.app/docs/apis/authentication
-  // https://developer.sasapay.app/docs/apis/waas/authentication
-  // Both are GET, HTTP Basic, with grant_type in the query string. The WaaS
-  // surface authenticates on its own /api/v2/waas path, not the v1 one.
   const urls = [];
   const fetch = async (url) => {
     urls.push(String(url));
@@ -75,8 +71,6 @@ test("token URLs match SasaPay's published authentication endpoints", async () =
 });
 
 test("the WaaS token response reports success as statusCode, not status", () => {
-  // The v1 auth response carries `status`/`detail`/`scope`; the WaaS one carries
-  // `statusCode: 0` instead. Both must read as a success.
   assert.equal(SasaPayClient.succeeded({ status: true, detail: "SUCCESS" }), true);
   assert.equal(SasaPayClient.succeeded({ statusCode: 0 }), true);
   assert.equal(SasaPayClient.succeeded({ statusCode: "0" }), true);

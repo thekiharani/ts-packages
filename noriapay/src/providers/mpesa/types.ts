@@ -23,14 +23,10 @@ interface MpesaBaseClientOptions {
   defaultHeaders?: HeadersInit;
   retry?: RetryPolicy | false;
   hooks?: HttpHooks;
-  /** Override individual endpoint paths, keyed by `MPESA_ENDPOINTS`. */
   endpoints?: Partial<Record<MpesaEndpointName, string>>;
-  /** Throw `BusinessError` when Daraja reports a non-zero `ResponseCode` in a 200 body. */
   throwOnBusinessError?: boolean;
   amountNormalization?: AmountNormalization;
-  /** `v1` (default) or `v3`; selects the B2C payment path. */
   b2cVersion?: MpesaB2CVersion;
-  /** Share OAuth tokens across processes. */
   tokenStore?: TokenStore;
   tokenCacheKey?: string;
 }
@@ -131,7 +127,6 @@ export interface MpesaB2CRequest extends JsonObject {
   QueueTimeOutURL: string;
   ResultURL: string;
   Occasion?: string;
-  /** Required by the v3 path only. */
   OriginatorConversationID?: string;
 }
 
@@ -264,14 +259,8 @@ export interface MpesaPullTransactionsRequest extends JsonObject {
   OffSetValue: string | number;
 }
 
-/**
- * Bill Manager, and the portal-only variants of the invoicing APIs, are documented
- * on the Daraja portal with per-merchant field sets. They are typed loosely rather
- * than guessed at, and the escape hatches on `MpesaClient` take the same shape.
- */
 export type MpesaBillManagerRequest = JsonObject;
 
-/** The STK result Daraja POSTs to `CallBackURL`. */
 export interface MpesaStkCallback extends JsonObject {
   Body: {
     stkCallback: {
@@ -286,7 +275,6 @@ export interface MpesaStkCallback extends JsonObject {
   };
 }
 
-/** The asynchronous result Daraja POSTs to `ResultURL` for B2C/B2B/reversal/status/balance. */
 export interface MpesaResultCallback extends JsonObject {
   Result: {
     ResultType: number | string;
@@ -304,7 +292,6 @@ export interface MpesaResultCallback extends JsonObject {
   };
 }
 
-/** The C2B confirmation/validation payload Daraja POSTs to a registered URL. */
 export interface MpesaC2BCallback extends JsonObject {
   TransactionType?: string;
   TransID: string;

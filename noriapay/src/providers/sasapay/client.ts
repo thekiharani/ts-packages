@@ -51,21 +51,14 @@ import type {
 
 export const SASAPAY_BASE_URLS = {
   sandbox: "https://sandbox.sasapay.app/api/v1",
-  /**
-   * Not published by SasaPay. Established by probing the live host and corroborated
-   * by the sibling Laravel SDK; override with `baseUrl` if SasaPay issues your
-   * application a different one.
-   */
   production: "https://api.sasapay.app/api/v1",
 } as const;
 
 export const SASAPAY_WAAS_BASE_URLS = {
   sandbox: "https://sandbox.sasapay.app/api/v2/waas",
-  /** Unpublished, on the same footing as `SASAPAY_BASE_URLS.production`. */
   production: "https://api.sasapay.app/api/v2/waas",
 } as const;
 
-/** Retained for backward compatibility; prefer `SASAPAY_BASE_URLS`. */
 export const SASAPAY_BASE_URL = SASAPAY_BASE_URLS.sandbox;
 
 export const SASAPAY_TOKEN_PATH = "/auth/token/";
@@ -133,12 +126,6 @@ export const SASAPAY_WAAS_ENDPOINTS = {
   utilityPayment: "/utilities/",
 } as const;
 
-/**
- * The Wallet-as-a-Service surface, on its own host and its own credentials.
- *
- * Reachable as `sasapay.waas`, which also carries the `authorized*` escape hatches
- * for WaaS endpoints this package does not wrap.
- */
 export class SasaPayWaasClient extends ProviderClient {
   constructor(
     config: ProviderClientConfig,
@@ -151,8 +138,6 @@ export class SasaPayWaasClient extends ProviderClient {
   endpoint(name: SasaPayWaasEndpointName): string {
     return this.endpoints[name];
   }
-
-  // ----------------------------------------------------------------- onboarding
 
   async personalOnboarding(
     request: SasaPayPayload,
@@ -172,7 +157,6 @@ export class SasaPayWaasClient extends ProviderClient {
     );
   }
 
-  /** Accepts KYC documents; sends multipart when `files` is supplied, JSON otherwise. */
   async personalKyc(
     request: SasaPayPayload,
     files?: MultipartInput,
@@ -207,8 +191,6 @@ export class SasaPayWaasClient extends ProviderClient {
     return this.kyc("businessKyc", request, files, options);
   }
 
-  // ------------------------------------------------------------------ customers
-
   async customers(query: QueryParams, options?: SasaPayRequestOptions): Promise<SasaPayResponse> {
     return this.get("customers", query, options);
   }
@@ -233,8 +215,6 @@ export class SasaPayWaasClient extends ProviderClient {
   ): Promise<SasaPayResponse> {
     return this.post("createSubWallet", request, options);
   }
-
-  // ------------------------------------------------------------------- payments
 
   async requestPayment(
     request: SasaPayPayload,
@@ -280,8 +260,6 @@ export class SasaPayWaasClient extends ProviderClient {
     return this.post("utilityPayment", request, options, true);
   }
 
-  // -------------------------------------------------------------------- queries
-
   async transactions(
     query: QueryParams,
     options?: SasaPayRequestOptions,
@@ -309,8 +287,6 @@ export class SasaPayWaasClient extends ProviderClient {
   ): Promise<SasaPayResponse> {
     return this.get("merchantBalance", { merchantCode: String(merchantCode) }, options);
   }
-
-  // ---------------------------------------------------------------- reference data
 
   async channelCodes(options?: SasaPayRequestOptions): Promise<SasaPayResponse> {
     return this.get("channelCodes", undefined, options);
@@ -485,7 +461,6 @@ export class SasaPayClient extends ProviderClient {
 
   private readonly endpoints: Record<SasaPayEndpointName, string>;
   private readonly paymentDefaults: Record<string, string | undefined>;
-  /** The Wallet-as-a-Service client, on the v2 host with its own credentials. */
   readonly waas: SasaPayWaasClient;
 
   constructor(options: SasaPayClientOptions) {
@@ -532,8 +507,6 @@ export class SasaPayClient extends ProviderClient {
     return this.endpoints[name];
   }
 
-  // ------------------------------------------------------------------ collections
-
   async requestPayment(
     request: SasaPayRequestPaymentRequest,
     options?: SasaPayRequestOptions,
@@ -543,7 +516,6 @@ export class SasaPayClient extends ProviderClient {
     return this.post("requestPayment", this.withPaymentDefaults(payload), options, true);
   }
 
-  /** Completes a wallet-channel collection with the customer's OTP. */
   async processPayment(
     request: SasaPayProcessPaymentRequest,
     options?: SasaPayRequestOptions,
@@ -571,8 +543,6 @@ export class SasaPayClient extends ProviderClient {
   ): Promise<SasaPayResponse> {
     return this.post("lipaFare", this.withPaymentDefaults(request), options, true);
   }
-
-  // --------------------------------------------------------------------- payouts
 
   async b2cPayment(
     request: SasaPayB2CRequest,
@@ -625,8 +595,6 @@ export class SasaPayClient extends ProviderClient {
     return this.post("internalFundMovement", request, options, true);
   }
 
-  // -------------------------------------------------------------------- queries
-
   async accountValidation(
     request: SasaPayPayload,
     options?: SasaPayRequestOptions,
@@ -641,7 +609,6 @@ export class SasaPayClient extends ProviderClient {
     return this.post("transactionStatus", request, options);
   }
 
-  /** The documented status query, which answers asynchronously on your callback URL. */
   async transactionStatusQuery(
     request: SasaPayPayload,
     options?: SasaPayRequestOptions,
@@ -677,8 +644,6 @@ export class SasaPayClient extends ProviderClient {
     return this.get("transactions", query, options);
   }
 
-  // ------------------------------------------------------------------- utilities
-
   async utilityPayment(
     request: SasaPayPayload,
     options?: SasaPayRequestOptions,
@@ -699,8 +664,6 @@ export class SasaPayClient extends ProviderClient {
   ): Promise<SasaPayResponse> {
     return this.post("registerIpnUrl", request, options);
   }
-
-  // -------------------------------------------------------- onboarding reference
 
   async channelCodes(options?: SasaPayRequestOptions): Promise<SasaPayResponse> {
     return this.get("channelCodes", undefined, options);
@@ -817,7 +780,6 @@ function resolveSasaPayTokenProvider(
     clientSecret,
     fetch: options.fetch,
     timeoutMs: options.timeoutMs,
-    // Documented as GET, with the grant type in the query string.
     query: { grant_type: "client_credentials" },
     cacheSkewMs: options.tokenCacheSkewMs,
     mapResponse: defaultTokenMapper,
@@ -835,5 +797,4 @@ function resolveSasaPayTokenProvider(
   });
 }
 
-/** Kept so existing code that imported the concrete type still compiles. */
 export type SasaPayAmountNormalization = AmountNormalization;

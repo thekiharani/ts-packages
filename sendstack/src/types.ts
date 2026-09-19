@@ -163,7 +163,6 @@ export interface TemplateVariable {
   name: string;
   type?: "string" | "number" | "boolean";
   required?: boolean;
-  /** Used at send time when the variable is absent; a required variable with no fallback fails 422. */
   fallback_value?: string | number | boolean;
   description?: string;
   example?: string;
@@ -181,12 +180,9 @@ export interface CreateTemplateRequest {
   html?: string;
   text?: string;
   body?: string;
-  /** WhatsApp templates: the approved Meta template name. */
   templateName?: string;
   template_name?: string;
-  /** WhatsApp templates: BCP-47 language tag of the approved template (e.g. `en_US`). */
   language?: string;
-  /** WhatsApp templates: ordered names for the `{{1}}`, `{{2}}`… body placeholders. */
   bodyVariables?: string[];
   body_variables?: string[];
   variables?: TemplateVariable[];
@@ -201,7 +197,6 @@ export interface CreateTemplateRequest {
   category?: string;
   description?: string;
   tags?: string[];
-  /** Create and publish in one call; otherwise the template starts as a draft. */
   publish?: boolean;
 }
 
@@ -276,9 +271,6 @@ export interface EmailTemplate {
   [key: string]: unknown;
 }
 
-/** Result of `templates.create(...)`: awaitable to the created template, and chainable
- *  with `.publish()` to create then publish in one expression -
- *  `await client.templates.create({...}).publish()`. */
 export interface PublishableTemplate extends Promise<EmailTemplate> {
   publish(options?: SendstackMutationOptions): Promise<EmailTemplate>;
 }
@@ -347,9 +339,7 @@ export type WhatsAppTemplateCategory = "marketing" | "utility" | "authentication
 
 export interface WhatsAppTemplateRef {
   name: string;
-  /** BCP-47 language tag of the approved template (e.g. `en_US`). */
   language: string;
-  /** Values for the template's `{{1}}`, `{{2}}`… body placeholders, in order. */
   variables?: string[];
   category?: WhatsAppTemplateCategory;
 }
@@ -361,9 +351,6 @@ export interface WhatsAppMediaRef {
   filename?: string;
 }
 
-/** A send is exactly one content mode: an approved `template` (business-initiated), a
- *  free-form `text` or `media` reply (deliverable only inside the 24h window), or a
- *  local `templateId` reference. */
 export interface SendWhatsAppRequest {
   to: string;
   from?: string;
@@ -433,7 +420,6 @@ export interface CreateWhatsAppSenderRequest {
   phone_number_id?: string;
   wabaId?: string;
   waba_id?: string;
-  /** Cloud API access token; stored encrypted and never echoed back. */
   accessToken?: string;
   access_token?: string;
   displayName?: string;
@@ -463,8 +449,6 @@ export interface WhatsAppSenderRef {
   object: string;
 }
 
-/** A non-paginated collection response (`{ data }` with no cursor), used by the
- *  sender-ID and billing list endpoints. */
 export interface SendstackList<T> {
   data: T[];
 }
@@ -804,17 +788,14 @@ export interface SendstackRawRequestOptions extends SendstackRequestOptions {
 }
 
 export interface EmailDefaults {
-  /** Default `from` applied to every email send when the call omits one. */
   from?: string;
 }
 
 export interface SmsDefaults {
-  /** Default sender id applied to every SMS send when the call omits one. */
   from?: string;
 }
 
 export interface WhatsAppDefaults {
-  /** Default sender (business number or its id) applied to every WhatsApp send when the call omits one. */
   from?: string;
 }
 

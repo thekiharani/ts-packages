@@ -42,10 +42,6 @@ test("buildMpesaSecurityCredential RSA-encrypts the plaintext initiator password
   const ciphertext = Buffer.from(credential, "base64");
   assert.equal(ciphertext.length, 256, "one RSA block for a 2048-bit key");
 
-  // Unwrapped with RSA_NO_PADDING rather than privateDecrypt + RSA_PKCS1_PADDING,
-  // which Node blocks from 20.11 as the CVE-2023-46809 mitigation. Reading the raw
-  // block is also the stronger check: it shows the padding really is PKCS#1 v1.5
-  // and not OAEP, which is what Daraja requires.
   const block = privateDecrypt({ key: privateKey, padding: constants.RSA_NO_PADDING }, ciphertext);
 
   assert.equal(block[0], 0x00);
@@ -64,7 +60,6 @@ test("buildMpesaSecurityCredential RSA-encrypts the plaintext initiator password
     "Daraja's algorithm encrypts the raw password, then base64s the ciphertext",
   );
 
-  // PKCS#1 v1.5 pads with random bytes, so two calls must not be identical.
   assert.notEqual(
     credential,
     buildMpesaSecurityCredential({ initiatorPassword: "Safaricom999!*!", certificate }),

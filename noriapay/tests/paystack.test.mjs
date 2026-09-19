@@ -80,7 +80,6 @@ test("every wrapped endpoint calls the method and path Paystack documents", asyn
   for (const [name, [method, template]] of Object.entries(PAYSTACK_ENDPOINTS)) {
     const parameters = [...template.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
     const args = parameters.map((parameter) => `sample-${parameter}`);
-    // Every method takes an optional body or query object after its path parameters.
     args.push({});
 
     seen.length = 0;

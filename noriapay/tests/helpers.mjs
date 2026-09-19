@@ -1,4 +1,3 @@
-/** A fetch double that records every call and answers from a route table. */
 export function mockFetch(routes) {
   const calls = [];
 

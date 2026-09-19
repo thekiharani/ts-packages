@@ -1,12 +1,5 @@
 import { ValidationError } from "./errors";
 
-/**
- * A single provider-published field constraint.
- *
- * `required` checks presence only, because providers routinely require a key
- * while accepting a blank value for it — Buni's `orgShortCode` on a shared
- * short code is the standing example.
- */
 export interface FieldRule {
   required?: boolean;
   notEmpty?: boolean;
@@ -14,7 +7,6 @@ export interface FieldRule {
   numeric?: boolean;
   pattern?: RegExp;
   boolean?: boolean;
-  /** Human-readable shape, appended to a pattern failure. */
   format?: string;
 }
 

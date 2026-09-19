@@ -249,8 +249,6 @@ test("the vending, query, eTIMS and P2P endpoints are reachable", async () => {
   ]);
 });
 
-// ------------------------------------------------------------------ IPN handling
-
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
 

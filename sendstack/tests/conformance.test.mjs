@@ -1,10 +1,3 @@
-// Route-drift conformance check.
-//
-// Introspects a live `Sendstack` instance - discovering every resource namespace
-// and method dynamically - and captures the (HTTP method, path) each one calls.
-// The captured set must equal the canonical contract in `conformance-routes.json`
-// (byte-identical across the SendStack SDK packages). This fails loudly if a
-// method is added, removed, or re-pointed at the wrong verb/path.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -28,9 +21,6 @@ function normalize(path) {
     .join("/");
 }
 
-// Positional args by method name: identifier-style methods receive the sentinel
-// (it lands in the path); payload methods receive an empty body; batch needs an
-// array; list takes none.
 function argsFor(name) {
   if (name === "sendBatch") return [[]];
   if (name === "list") return [];
@@ -70,7 +60,7 @@ async function discoverActualRoutes() {
 
   for (const key of Object.keys(client)) {
     const resource = client[key];
-    if (resource === null || typeof resource !== "object") continue; // skip token/baseUrl/timeoutMs
+    if (resource === null || typeof resource !== "object") continue;
     for (const methodName of Object.keys(resource)) {
       const fn = resource[methodName];
       if (typeof fn !== "function") continue;

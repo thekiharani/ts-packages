@@ -155,13 +155,6 @@ export class HttpClient {
   }
 }
 
-/**
- * Combines the caller's signal with this request's timeout.
- *
- * Both have to be honoured: aborting only on the caller's signal would silently
- * discard `timeoutMs`, and aborting only on the timeout would ignore a caller
- * that has already given up.
- */
 function withTimeout(
   callerSignal: AbortSignal | undefined,
   timeoutMs: number | undefined,
@@ -208,7 +201,6 @@ function classifyError(
     return new TimeoutError(`Request timed out for ${url}`, { cause: error });
   }
 
-  // The caller cancelled; surface their abort rather than dressing it as a failure.
   if (callerSignal?.aborted) {
     return error;
   }
@@ -238,7 +230,6 @@ async function parseResponseBody(
     try {
       return JSON.parse(text) as JsonValue | JsonObject;
     } catch {
-      // A provider that mislabels a plain-text error as JSON should not crash the call.
       return text;
     }
   }
@@ -268,7 +259,6 @@ function buildRequestInit(
   };
 
   if (multipart !== undefined) {
-    // fetch has to set the multipart boundary itself.
     context.headers.delete("content-type");
     init.body = buildFormData(
       (context.body as MultipartInput | undefined) ?? multipart,
@@ -493,7 +483,6 @@ function getRetryDelayMs(
   return Math.min(computed + jitter, maxDelayMs);
 }
 
-/** `Retry-After` is either delta-seconds or an HTTP date. */
 function parseRetryAfter(header: string | null): number | undefined {
   if (!header) {
     return undefined;

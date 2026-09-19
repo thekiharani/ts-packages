@@ -33,14 +33,6 @@ import type {
   KcbBuniResponse,
 } from "./types";
 
-/**
- * `uat` is published on the Buni developer portal.
- *
- * KCB does not publish a production host. The two sibling implementations in this
- * organisation disagree on what it is (`api.buni.kcbgroup.com` versus
- * `buni.kcbgroup.com`), so this client refuses to guess: set `baseUrl` explicitly
- * for production, from whatever KCB issued your integration.
- */
 export const KCB_BUNI_BASE_URLS = {
   uat: "https://uat.buni.kcbgroup.com",
 } as const;
@@ -58,11 +50,6 @@ export const KCB_BUNI_ENDPOINTS = {
   p2pTransferStatusInquiry: "/kcb/bi/ips/p2p/transfer/status/inquiry/1.0.0/{path}",
 } as const;
 
-/**
- * From the `MpesaExpressAPIService` OpenAPI document. All eight fields are
- * required, but the short-code pair may be blank when `sharedShortCode` is true —
- * which is why `required` here checks presence and not emptiness.
- */
 export const KCB_BUNI_MPESA_STK_PUSH_RULES: FieldRules = {
   phoneNumber: {
     required: true,
@@ -86,7 +73,6 @@ export const KCB_BUNI_MPESA_STK_PUSH_HEADER_RULES: FieldRules = {
   messageId: { required: true, notEmpty: true, max: 32 },
 };
 
-/** From the `FundsTransferAPIService` OpenAPI document. */
 export const KCB_BUNI_FUNDS_TRANSFER_RULES: FieldRules = {
   companyCode: { required: true, notEmpty: true, max: 15 },
   transactionType: { required: true, notEmpty: true, max: 2 },
@@ -186,13 +172,6 @@ export class KcbBuniClient extends ProviderClient {
     return this.endpoints[name];
   }
 
-  /**
-   * M-PESA Express through Buni.
-   *
-   * The payload's `callbackUrl` receives a Daraja-shaped STK result, not an Instant
-   * Payment Notification. It carries no `Signature` header, so `verifyKcbBuniIpn`
-   * must not be applied to that route.
-   */
   async mpesaStkPush(
     request: KcbBuniMpesaStkPushRequest,
     messageId: string,
@@ -314,10 +293,6 @@ export class KcbBuniClient extends ProviderClient {
     });
   }
 
-  /**
-   * `KCBKEeTIMSKraServices` publishes a wildcard resource with no schema, so the
-   * operation path and body come from the KRA integration pack KCB issues.
-   */
   async etimsRequest(
     path: string,
     request?: KcbBuniPayload,
@@ -335,10 +310,6 @@ export class KcbBuniClient extends ProviderClient {
     });
   }
 
-  /**
-   * `KCBBIIpsP2PTransferStatusInquiry` is a wildcard POST resource and is not
-   * deployed on the UAT gateway.
-   */
   async p2pTransferStatusInquiry(
     request: KcbBuniPayload,
     path = "",
@@ -426,7 +397,6 @@ function resolveKcbBuniTokenProvider(
     clientSecret: options.consumerSecret,
     fetch: options.fetch,
     timeoutMs: options.timeoutMs,
-    // Buni's token endpoint is a form POST, unlike Daraja's and SasaPay's GET.
     method: "POST",
     asForm: true,
     body: { grant_type: "client_credentials" },

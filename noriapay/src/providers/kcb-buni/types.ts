@@ -14,19 +14,15 @@ import type { KCB_BUNI_ENDPOINTS } from "./client";
 
 export type KcbBuniEndpointName = keyof typeof KCB_BUNI_ENDPOINTS;
 
-/** KCB publishes a UAT gateway; `production` needs an explicit `baseUrl`. */
 export type KcbBuniEnvironment = "uat" | "sandbox" | "production";
 
-/** A request body for an endpoint whose schema KCB publishes per integration. */
 export type KcbBuniPayload = JsonObject;
 
 interface KcbBuniBaseClientOptions {
   environment?: KcbBuniEnvironment;
   baseUrl?: string;
-  /** Full token URL; defaults to `baseUrl` + `tokenPath`. */
   tokenUrl?: string;
   tokenPath?: string;
-  /** Sent as the `apikey` header on every request, when the gateway requires one. */
   apiKey?: string;
   fetch?: FetchLike;
   timeoutMs?: number;
@@ -35,13 +31,10 @@ interface KcbBuniBaseClientOptions {
   retry?: RetryPolicy | false;
   hooks?: HttpHooks;
   endpoints?: Partial<Record<KcbBuniEndpointName, string>>;
-  /** Throw `BusinessError` on a non-zero `header.statusCode`. */
   throwOnBusinessError?: boolean;
   amountNormalization?: AmountNormalization;
-  /** Run the published field rules before sending. Defaults to true. */
   validate?: boolean;
   tokenStore?: TokenStore;
-  /** Defaults for the M-PESA Express headers KCB declares required. */
   mpesaExpress?: {
     routeCode?: string;
     operation?: string;
@@ -70,11 +63,9 @@ export interface KcbBuniFromEnvOptions extends KcbBuniBaseClientOptions {
 }
 
 export interface KcbBuniRequestOptions extends ProviderRequestOptions {
-  /** Extra headers merged in ahead of the SDK's own. */
   headers?: HeadersInit;
 }
 
-/** Buni answers with a gateway `header` and, where relevant, an inner `response`. */
 export interface KcbBuniResponse extends JsonObject {
   header?: {
     messageID?: string;
@@ -87,13 +78,10 @@ export interface KcbBuniResponse extends JsonObject {
   response?: JsonObject;
 }
 
-/** `MpesaExpressAPIService` `STKPushRequest`. */
 export interface KcbBuniMpesaStkPushRequest extends JsonObject {
   phoneNumber: string;
-  /** Decimal values are not permitted. */
   amount: string | number;
   invoiceNumber: string;
-  /** When true, KCB substitutes its own values for `orgShortCode` and `orgPassKey`. */
   sharedShortCode: boolean;
   orgShortCode: string;
   orgPassKey: string;
@@ -111,7 +99,6 @@ export interface KcbBuniMpesaStkPushResponse extends KcbBuniResponse {
   };
 }
 
-/** `FundsTransferAPIService` `FundsTransferRequest`. */
 export interface KcbBuniFundsTransferRequest extends JsonObject {
   companyCode: string;
   transactionType: string;
@@ -129,7 +116,6 @@ export interface KcbBuniFundsTransferResponse extends KcbBuniResponse {
   responsePayload?: JsonObject;
 }
 
-/** The signed till notification: a nested envelope with the payment under `requestPayload`. */
 export interface KcbBuniTillNotification extends JsonObject {
   header: {
     messageID: string;
@@ -162,7 +148,6 @@ export interface KcbBuniTillNotification extends JsonObject {
   };
 }
 
-/** The signed account notification: a flat envelope. */
 export interface KcbBuniAccountNotification extends JsonObject {
   transactionReference: string;
   requestId: string;
@@ -180,7 +165,6 @@ export interface KcbBuniAccountNotification extends JsonObject {
   tillNumber: string;
 }
 
-/** The unsigned pre-payment validation request. */
 export interface KcbBuniValidationRequest extends JsonObject {
   requestId: string;
   customerReference: string;

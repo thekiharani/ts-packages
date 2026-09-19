@@ -24,7 +24,6 @@ export class TimeoutError extends NoriapayError {
   }
 }
 
-/** A transport-level failure that never reached the provider: DNS, TLS, connection reset. */
 export class NetworkError extends NoriapayError {
   constructor(message: string, options?: { cause?: unknown; details?: unknown }) {
     super(message, { ...options, code: "NETWORK_ERROR" });
@@ -46,7 +45,6 @@ export class WebhookVerificationError extends NoriapayError {
   }
 }
 
-/** A payload rejected before it was sent, by the provider's own published field rules. */
 export class ValidationError extends NoriapayError {
   readonly errors: string[];
 
@@ -57,13 +55,6 @@ export class ValidationError extends NoriapayError {
   }
 }
 
-/**
- * A failure the provider reported inside an HTTP 200 body.
- *
- * Every provider in this package signals business outcomes this way — M-PESA with
- * `ResponseCode`, SasaPay and Paystack with `status`, KCB Buni with `header.statusCode` —
- * so an HTTP-level check alone will treat a declined payment as a success.
- */
 export class BusinessError extends NoriapayError {
   readonly provider: string;
   readonly statusCode?: string;

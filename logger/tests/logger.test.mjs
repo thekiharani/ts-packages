@@ -756,7 +756,6 @@ test("createServiceLogger dedupe routes each level to a single CloudWatch stream
   const allLogs = puts.find((command) => command.input.logStreamName === "logger-2024-01-01");
   const errorLogs = puts.find((command) => command.input.logStreamName === "errors-2024-01-01");
 
-  // With dedupe, info goes ONLY to logger-* and error goes ONLY to error-*.
   assert.equal(allLogs.input.logEvents.length, 1);
   assert.match(allLogs.input.logEvents[0].message, /"level":"info"/);
   assert.equal(errorLogs.input.logEvents.length, 1);

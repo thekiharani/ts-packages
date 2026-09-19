@@ -17,7 +17,6 @@ export interface AccessToken {
   raw: JsonObject;
 }
 
-/** A token that never expires and never needs fetching, such as a Paystack secret key. */
 export class StaticAccessTokenProvider implements AccessTokenProvider {
   constructor(private readonly token: string) {}
 
@@ -33,10 +32,8 @@ export interface ClientCredentialsTokenProviderOptions {
   fetch?: FetchLike;
   timeoutMs?: number;
   query?: QueryParams;
-  /** Body sent with a POST token request; ignored for GET. */
   body?: Record<string, string>;
   method?: Extract<HttpMethod, "GET" | "POST">;
-  /** Encode the POST body as `application/x-www-form-urlencoded` rather than JSON. */
   asForm?: boolean;
   cacheSkewMs?: number;
   mapResponse?: (payload: JsonObject) => AccessToken;
@@ -81,7 +78,6 @@ export class ClientCredentialsTokenProvider implements AccessTokenProvider {
       return this.cached.accessToken;
     }
 
-    // Concurrent callers share one authentication round trip.
     if (!this.inFlight) {
       const pending = this.fetchToken().finally(() => {
         if (this.inFlight === pending) {
@@ -175,18 +171,10 @@ export interface CachedAccessTokenProviderOptions {
   provider: AccessTokenProvider;
   store: TokenStore;
   cacheKey: string;
-  /** Seconds shaved off the token's own lifetime before it is considered stale. */
   cacheSkewSeconds?: number;
-  /** Fixed lifetime to use when the inner provider does not report one. */
   cacheTtlSeconds?: number;
 }
 
-/**
- * Keeps tokens in a store that outlives the process.
- *
- * Without this every worker, container and serverless invocation re-authenticates,
- * which on Daraja's low OAuth rate limits is a real source of 429s.
- */
 export class CachedAccessTokenProvider implements AccessTokenProvider {
   private readonly provider: AccessTokenProvider;
   private readonly store: TokenStore;
@@ -253,7 +241,6 @@ export class CachedAccessTokenProvider implements AccessTokenProvider {
   }
 }
 
-/** An in-memory `TokenStore`, useful in tests and single-process deployments. */
 export class MemoryTokenStore implements TokenStore {
   private readonly entries = new Map<string, { value: string; expiresAt: number }>();
 

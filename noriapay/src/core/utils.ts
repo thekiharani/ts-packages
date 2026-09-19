@@ -53,7 +53,6 @@ export function encodeBasicAuth(username: string, password: string): string {
   }
 
   if (typeof globalThis.btoa === "function") {
-    // btoa is latin1-only; credentials outside it would be silently corrupted.
     if (/^[\x00-\xFF]*$/.test(raw)) {
       return globalThis.btoa(raw);
     }
@@ -66,14 +65,6 @@ export function encodeBasicAuth(username: string, password: string): string {
   throw new ConfigurationError("No base64 encoder is available in this runtime.");
 }
 
-/**
- * Renders an amount the way payment providers expect to read it.
- *
- * A plain `String(value)` leaks binary rounding artefacts — `0.1 + 0.2` becomes
- * `"0.30000000000000004"` — and switches to exponent notation above 1e21, both of
- * which providers reject. Values are rounded to 8 decimal places and trailing
- * zeros removed, so `100.50` sends as `"100.5"` and `1000` as `"1000"`.
- */
 export function amountToString(value: string | number | boolean): string {
   if (typeof value === "boolean") {
     return value ? "1" : "0";
@@ -96,13 +87,6 @@ export function toAmountString(value: string | number): string {
   return amountToString(value);
 }
 
-/**
- * Rewrites `Amount`/`amount` in place, honouring the `"none"` opt-out.
- *
- * Arrays pass through untouched. Spreading one would turn a bulk-invoice list
- * into `{"0":…}`, which the provider rejects, and the bulk endpoints legitimately
- * send arrays.
- */
 export function normalizeAmount<T extends object>(
   payload: T,
   normalization: AmountNormalization = "string",
@@ -132,11 +116,6 @@ export function resolveAmountNormalization(value?: string | null): AmountNormali
     : "string";
 }
 
-/**
- * Rewrites a Kenyan mobile number into the `2547XXXXXXXX` / `2541XXXXXXXX` form
- * every provider here requires. Anything that is not recognisably a Kenyan
- * number is returned untouched rather than mangled.
- */
 export function normalizeKenyanPhoneNumber<T extends string | number>(value: T): T | string {
   const raw = String(value);
 
@@ -192,13 +171,6 @@ export function toJsonObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-/**
- * Formats a timestamp in `YYYYMMDDHHMMSS`, in `timeZone` (default `Africa/Nairobi`).
- *
- * The default is not cosmetic: Daraja validates the STK password against a
- * timestamp in East Africa Time, so a container running in UTC would otherwise
- * produce a password three hours out and every push would be rejected.
- */
 export function formatTimestamp(date: Date = new Date(), timeZone = "Africa/Nairobi"): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -216,7 +188,6 @@ export function formatTimestamp(date: Date = new Date(), timeZone = "Africa/Nair
     lookup[part.type] = part.value;
   }
 
-  // Intl renders midnight as hour "24" in some ICU versions.
   const hour = lookup["hour"] === "24" ? "00" : (lookup["hour"] ?? "00");
 
   return [
@@ -229,13 +200,6 @@ export function formatTimestamp(date: Date = new Date(), timeZone = "Africa/Nair
   ].join("");
 }
 
-/**
- * Matches an address against an exact IP, a CIDR block, or `*`.
- *
- * Provider allowlists are published as bare addresses today, but operators
- * routinely need to widen one to a range in front of a load balancer, and an
- * exact string compare silently never matches a CIDR entry.
- */
 export function ipMatches(ip: string, pattern: string): boolean {
   const address = ip.trim();
   const rule = pattern.trim();
@@ -296,7 +260,6 @@ export function ipInList(ip: string | null | undefined, patterns: Iterable<strin
   return false;
 }
 
-/** Normalizes an IP to its bytes: 4 for IPv4, 16 for IPv6. Returns undefined if unparseable. */
 function parseIp(value: string): number[] | undefined {
   const text = value.trim();
 
@@ -337,7 +300,6 @@ function parseIpv6(value: string): number[] | undefined {
   let text = value;
   let tail: number[] = [];
 
-  // A trailing dotted quad, as in `::ffff:192.0.2.1`.
   const dotted = text.lastIndexOf(":");
   const maybeIpv4 = text.slice(dotted + 1);
 

@@ -93,13 +93,6 @@ export const MPESA_ENDPOINTS = {
   pullTransactions: "/pulltransactions/v1/query",
 } as const;
 
-/**
- * Formats a Daraja timestamp as `YYYYMMDDHHMMSS`.
- *
- * Defaults to `Africa/Nairobi`, not the host clock: Daraja validates the STK
- * password against East Africa Time, so a server running in UTC would otherwise
- * sign every push three hours out of date.
- */
 export function buildMpesaTimestamp(date: Date = new Date(), timeZone = "Africa/Nairobi"): string {
   return formatTimestamp(date, timeZone);
 }
@@ -115,16 +108,6 @@ export function buildMpesaStkPassword(input: {
   ).toString("base64");
 }
 
-/**
- * Builds the `SecurityCredential` the payout, reversal, status and balance APIs
- * require, following Daraja's published algorithm: write the unencrypted initiator
- * password to a byte array, encrypt it with the M-PESA X.509 certificate using RSA
- * with PKCS #1 v1.5 padding (not OAEP), then base64 the ciphertext.
- *
- * `certificate` is the PEM downloaded from the Daraja portal — sandbox and
- * production use different certificates, and the wrong one fails as a locked
- * credential rather than as a decode error.
- */
 export function buildMpesaSecurityCredential(input: {
   initiatorPassword: string;
   certificate: string;
@@ -226,8 +209,6 @@ export class MpesaClient extends ProviderClient {
     this.b2cVersion = options.b2cVersion ?? "v1";
   }
 
-  // ---------------------------------------------------------------- collections
-
   async stkPush(
     request: MpesaStkPushRequest,
     options?: MpesaRequestOptions,
@@ -265,7 +246,6 @@ export class MpesaClient extends ProviderClient {
     return this.registerC2BUrls(request, "v1", options);
   }
 
-  /** Sandbox only; Daraja does not expose C2B simulation in production. */
   async c2bSimulate(
     request: MpesaC2BSimulateRequest,
     options?: MpesaRequestOptions,
@@ -274,8 +254,6 @@ export class MpesaClient extends ProviderClient {
 
     return this.post("c2bSimulate", payload, options, "M-PESA C2B simulate");
   }
-
-  // -------------------------------------------------------------------- payouts
 
   async b2cPayment(
     request: MpesaB2CRequest,
@@ -357,8 +335,6 @@ export class MpesaClient extends ProviderClient {
     return this.post("taxRemittance", request, options, "M-PESA tax remittance");
   }
 
-  // ------------------------------------------------------------------- queries
-
   async reversal(
     request: MpesaReversalRequest,
     options?: MpesaRequestOptions,
@@ -390,8 +366,6 @@ export class MpesaClient extends ProviderClient {
   ): Promise<MpesaQrCodeResponse> {
     return this.post("dynamicQr", request, options, "M-PESA QR generation");
   }
-
-  // -------------------------------------------------------------- bill manager
 
   async billManagerOptIn(
     request: MpesaBillManagerRequest,
@@ -498,8 +472,6 @@ export class MpesaClient extends ProviderClient {
     });
   }
 
-  // ------------------------------------------------------- ratiba and pull APIs
-
   async ratibaStandingOrder(
     request: MpesaRatibaStandingOrderRequest,
     options?: MpesaRequestOptions,
@@ -509,7 +481,6 @@ export class MpesaClient extends ProviderClient {
     return this.post("ratibaStandingOrder", payload, options, "M-PESA Ratiba standing order");
   }
 
-  /** Registers the shortcode and callback that `pullTransactions()` then queries. */
   async registerPullTransactions(
     request: MpesaPullTransactionsRegisterRequest,
     options?: MpesaRequestOptions,
@@ -532,7 +503,6 @@ export class MpesaClient extends ProviderClient {
     });
   }
 
-  /** The resolved path for an endpoint, after any constructor overrides. */
   endpoint(name: MpesaEndpointName): string {
     return this.endpoints[name];
   }

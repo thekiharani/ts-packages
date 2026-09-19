@@ -3,13 +3,6 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { ConfigurationError, WebhookVerificationError } from "../../core/errors";
 import { ipInList } from "../../core/utils";
 
-/**
- * Source addresses observed for SasaPay callbacks.
- *
- * SasaPay does not publish an allowlist; this list is carried by the sibling
- * Laravel SDK and is treated as observed, not authoritative. Entries may be exact
- * addresses or CIDR blocks.
- */
 export const SASAPAY_CALLBACK_IPS = [
   "47.129.43.141",
   "13.229.247.179",
@@ -23,11 +16,6 @@ export const SASAPAY_CALLBACK_IPS = [
   "155.12.30.58",
 ] as const;
 
-/**
- * SasaPay's callbacks name the same value differently across C2B, IPN, B2C, B2B,
- * remittance, utilities, WaaS and bulk-status payloads. These aliases let a handler
- * read one canonical field without a switch per product.
- */
 export const SASAPAY_CALLBACK_FIELD_ALIASES = {
   sasapayTransactionCode: [
     "sasapay_transaction_code",
@@ -81,7 +69,6 @@ export const SASAPAY_CALLBACK_FIELD_ALIASES = {
 
 export type SasaPayCallbackField = keyof typeof SASAPAY_CALLBACK_FIELD_ALIASES;
 
-/** Reads a canonical field from whichever alias this particular callback used. */
 export function sasaPayCallbackValue(
   payload: Record<string, unknown>,
   field: SasaPayCallbackField,
@@ -116,23 +103,6 @@ export function verifySasaPayCallbackIp(
   return ipInList(sourceIp, allowedIps);
 }
 
-/**
- * Verifies a capability token carried on the callback URL.
- *
- * **This is the control this package recommends.** SasaPay publishes no signature,
- * HMAC, checksum or allowlist for any of its callbacks, and `CallBackURL` is supplied
- * per request — so append `?token=<secret>` when you initiate, and check it here on
- * receipt. Only SasaPay ever saw the token, so a caller that presents it knew a secret
- * you sent nowhere else.
- *
- * What it does not buy: it authenticates the *caller*, not the *body*. A token leaked
- * through a log or a proxy is enough to forge a settlement, so keep it out of logs,
- * rotate it if a callback URL is ever exposed, and still reconcile against a status
- * query before releasing goods.
- *
- * `expected` may be the token itself or its lowercase SHA-256 hex digest, so the
- * plaintext need not be stored alongside the config.
- */
 export function verifySasaPayCallbackToken(
   token: string | null | undefined,
   expected: string,
@@ -158,10 +128,6 @@ export function requireSasaPayCallbackToken(
   }
 }
 
-/**
- * The canonical message an HMAC callback signature is computed over:
- * `code-merchant-account-reference-amount`, read through the field aliases.
- */
 export function sasaPayCallbackSignatureMessage(payload: Record<string, unknown>): string {
   const fields: SasaPayCallbackField[] = [
     "sasapayTransactionCode",
@@ -193,18 +159,6 @@ export function computeSasaPayCallbackSignature(
     .digest("hex");
 }
 
-/**
- * Verifies an HMAC-SHA512 signature over the canonical callback message.
- *
- * **Not a SasaPay-published scheme.** Searching SasaPay's documentation for
- * `signature`, `hmac`, `sha512` and `checksum` returns nothing for any callback.
- * This exists for parity with the sibling Laravel SDK and for accounts where SasaPay
- * has separately issued this scheme. If your account has not, use
- * `verifySasaPayCallbackToken` instead — enabling this against a provider that never
- * signs anything rejects every legitimate callback.
- *
- * The signature is read from a `sasapay_signature` field unless passed explicitly.
- */
 export function verifySasaPayCallbackSignature(
   payload: Record<string, unknown>,
   signature: string | null | undefined,
@@ -228,21 +182,12 @@ export function verifySasaPayCallbackSignature(
 }
 
 export interface SasaPayCallbackVerificationOptions {
-  /** The capability token you appended to `CallBackURL`, or its SHA-256 hex digest. */
   expectedToken?: string;
-  /** Secret for the HMAC scheme; only set this if SasaPay issued you one. */
   secretKey?: string;
   trustedIps?: Iterable<string>;
   enforceIpAllowlist?: boolean;
 }
 
-/**
- * Applies whichever controls are configured, and reports which one passed.
- *
- * Returns `verified: false` with `reason: "unsupported"` when nothing is configured,
- * so a caller can store the callback and refuse to settle rather than treating an
- * unauthenticated request as genuine.
- */
 export function verifySasaPayCallback(
   input: {
     payload: Record<string, unknown>;

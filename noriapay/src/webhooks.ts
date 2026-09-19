@@ -9,14 +9,6 @@ export const PAYSTACK_WEBHOOK_IPS = [
   "52.214.14.220",
 ] as const;
 
-/**
- * Safaricom publishes no callback signature and no fixed source-IP list for Daraja.
- *
- * The only controls available are keeping the callback URL unguessable and
- * confirming every result with `transactionStatus()` before releasing goods.
- * `verifyMpesaCallbackToken` implements the first; nothing here can implement a
- * signature check Safaricom does not offer.
- */
 export const MPESA_CALLBACK_SECURITY_NOTE =
   "Daraja callbacks are unsigned. Use an unguessable callback URL, verify the source, and confirm results with a transaction status query.";
 
@@ -26,13 +18,6 @@ export function computePaystackSignature(rawBody: RawBody, secretKey: string): s
   return createHmac("sha512", secretKey).update(toBuffer(rawBody)).digest("hex");
 }
 
-/**
- * Verifies Paystack's `x-paystack-signature`: HMAC-SHA512 of the raw body, keyed
- * with your secret key.
- *
- * `rawBody` must be the bytes as received. Re-serializing a parsed object changes
- * key order and whitespace and the digest will not match.
- */
 export function verifyPaystackSignature(
   rawBody: RawBody,
   signature: string | null | undefined,
@@ -62,13 +47,6 @@ export function requirePaystackSignature(
   }
 }
 
-/**
- * Matches a source address against an allowlist of exact addresses or CIDR blocks.
- *
- * CIDR matters in practice: providers publish bare addresses, but operators behind
- * a load balancer or NAT routinely need to widen an entry to a range, and an exact
- * string compare would silently never match one.
- */
 export function verifySourceIp(
   sourceIp: string | null | undefined,
   allowedIps: Iterable<string>,
@@ -89,14 +67,6 @@ export function requireSourceIp(
 
 export { ipMatches };
 
-/**
- * Verifies a capability token on an M-PESA callback URL.
- *
- * Daraja lets you set `CallBackURL`/`ResultURL` per request, so appending
- * `?token=<secret>` and checking it here is the only caller authentication available.
- * It proves the caller knew a secret you only ever sent to Safaricom; it does not
- * authenticate the body, so still confirm with a status query before settling.
- */
 export function verifyMpesaCallbackToken(
   token: string | null | undefined,
   expected: string,

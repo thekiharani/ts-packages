@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { ApiError, HttpClient, NetworkError, TimeoutError } from "../dist/index.js";
 import { json } from "./helpers.mjs";
 
-/** A fetch that resolves after `ms` unless its signal aborts first. */
 function slowFetch(ms, response = () => json({ ok: true })) {
   return (url, init = {}) =>
     new Promise((resolve, reject) => {
@@ -14,7 +13,6 @@ function slowFetch(ms, response = () => json({ ok: true })) {
         reject(error);
       };
 
-      // Real fetch rejects immediately on an already-aborted signal.
       if (init.signal?.aborted) {
         abort();
         return;

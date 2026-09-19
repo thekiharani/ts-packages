@@ -1,16 +1,5 @@
 import { BusinessError } from "./errors";
 
-/**
- * Reads the business outcome each provider reports inside an HTTP 200 body.
- *
- * An HTTP-level check is not enough here. Daraja answers a rejected STK push with
- * `200 {"ResponseCode":"1"}`, SasaPay and Paystack with `200 {"status":false}`,
- * and KCB Buni with a non-zero `header.statusCode` — all of which `response.ok`
- * reports as success.
- *
- * `succeeded()` returns `undefined` when no known marker is present, so an
- * unrecognised response shape is never reported as a failure.
- */
 export type BusinessStatusProvider = "mpesa" | "sasapay" | "paystack" | "kcb_buni";
 
 export function businessSucceeded(
@@ -163,11 +152,6 @@ function paystackSucceeded(body: Record<string, unknown>): boolean | undefined {
   return booleanish(body["status"]);
 }
 
-/**
- * A Buni M-PESA Express reply carries two independent verdicts: `header.statusCode`
- * is the gateway's and `response.ResponseCode` is Safaricom's, so when both are
- * present both must be zero.
- */
 function kcbBuniSucceeded(body: Record<string, unknown>): boolean | undefined {
   const markers = [
     dig(body, ["header", "statusCode"]),

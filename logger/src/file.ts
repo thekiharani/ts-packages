@@ -154,7 +154,6 @@ function extractTimestamp(message: string): number {
       }
     }
   } catch {
-    // Fall back to wall clock if the line is not valid JSON.
   }
 
   return Date.now();
