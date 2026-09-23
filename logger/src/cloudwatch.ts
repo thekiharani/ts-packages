@@ -95,6 +95,9 @@ class CloudWatchLogBuffer {
     this.#logGroupName = config.logGroupName;
     this.#runtimeContext = runtimeContext;
     this.#streamConfig = config.stream;
+    if (config.retentionInDays !== undefined) {
+      validateRetentionInDays(config.retentionInDays);
+    }
     this.#retentionInDays = config.retentionInDays;
     this.#createLogGroup = config.createLogGroup ?? true;
     this.#createLogStream = config.createLogStream ?? true;
@@ -156,7 +159,7 @@ class CloudWatchLogBuffer {
     this.trimQueueIfNeeded();
 
     if (this.#queue.length >= this.#maxBatchCount || this.#queueBytes >= this.#maxBatchBytes) {
-      void this.flush();
+      this.flushInBackground();
       return;
     }
 
@@ -202,8 +205,14 @@ class CloudWatchLogBuffer {
 
     this.#flushTimer = setTimeout(() => {
       this.#flushTimer = undefined;
-      void this.flush();
+      this.flushInBackground();
     }, delayMs);
+  }
+
+  private flushInBackground(): void {
+    this.flush().catch((error: unknown) => {
+      this.writeInternalError("Failed to flush logs to CloudWatch.", error);
+    });
   }
 
   private clearFlushTimer(): void {
@@ -222,13 +231,11 @@ class CloudWatchLogBuffer {
       return;
     }
 
-    await this.ensureLogGroup();
-
     while (this.#queue.length > 0) {
       const batch = this.takeBatch();
-      await this.ensureResources(batch.streamName);
 
       try {
+        await this.ensureResources(batch.streamName);
         await this.#client.send(
           new PutLogEventsCommand({
             logGroupName: this.#logGroupName,
@@ -245,6 +252,10 @@ class CloudWatchLogBuffer {
 
         this.#retryDelayMs = this.#retryBaseDelayMs;
       } catch (error) {
+        if (isAwsError(error, "ResourceNotFoundException")) {
+          this.#logGroupInit = undefined;
+          this.#streamInit.delete(batch.streamName);
+        }
         this.prependBatch(batch.events);
         this.writeInternalError("Failed to publish logs to CloudWatch.", error);
         this.scheduleFlush(this.#retryDelayMs);
@@ -303,7 +314,10 @@ class CloudWatchLogBuffer {
       return;
     }
 
-    this.#logGroupInit ??= this.initializeLogGroup();
+    this.#logGroupInit ??= this.initializeLogGroup().catch((error: unknown) => {
+      this.#logGroupInit = undefined;
+      throw error;
+    });
     await this.#logGroupInit;
   }
 
@@ -323,7 +337,6 @@ class CloudWatchLogBuffer {
     }
 
     if (this.#retentionInDays !== undefined) {
-      validateRetentionInDays(this.#retentionInDays);
       await this.#client.send(
         new PutRetentionPolicyCommand({
           logGroupName: this.#logGroupName,
@@ -341,7 +354,10 @@ class CloudWatchLogBuffer {
     let init = this.#streamInit.get(streamName);
 
     if (!init) {
-      init = this.initializeLogStream(streamName);
+      init = this.initializeLogStream(streamName).catch((error: unknown) => {
+        this.#streamInit.delete(streamName);
+        throw error;
+      });
       this.#streamInit.set(streamName, init);
     }
 

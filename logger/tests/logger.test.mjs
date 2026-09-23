@@ -874,8 +874,8 @@ test("cloudwatch destination can apply retention without creating the log group"
   assert.equal(retentionCommand.input.retentionInDays, 90);
 });
 
-test("cloudwatch destination rejects unsupported retention values", async () => {
-  const destination = createCloudWatchDestination(
+test("cloudwatch destination rejects unsupported retention values", () => {
+  assert.throws(() => createCloudWatchDestination(
     {
       client: {
         send: async () => ({}),
@@ -889,10 +889,7 @@ test("cloudwatch destination rejects unsupported retention values", async () => 
       flushIntervalMs: 60_000,
     },
     TEST_RUNTIME,
-  );
-
-  destination.stream.write('{"time":1,"msg":"hello"}\n');
-  await assert.rejects(() => destination.close(), /Unsupported CloudWatch retentionInDays '2'/);
+  ), /Unsupported CloudWatch retentionInDays '2'/);
 });
 
 test("cloudwatch destination accepts explicit aws credentials and otherwise relies on sdk defaults", async () => {
@@ -1292,7 +1289,7 @@ test("cloudwatch destination splits log events into multiple requests when batch
   assert.equal(putCommands[1].input.logEvents.length, 1);
 });
 
-test("cloudwatch destination surfaces initialization failures for non-AWS-exists errors", async () => {
+test("cloudwatch destination reports log-group failures instead of throwing", async () => {
   const client = {
     send: async (command) => {
       if (command instanceof CreateLogGroupCommand) {
@@ -1316,11 +1313,19 @@ test("cloudwatch destination surfaces initialization failures for non-AWS-exists
     TEST_RUNTIME,
   );
 
-  destination.stream.write('{"time":1,"msg":"hello"}\n');
-  await assert.rejects(() => destination.close(), /boom/);
+  const write = process.stderr.write;
+  const reported = [];
+  process.stderr.write = (text) => reported.push(String(text));
+  try {
+    destination.stream.write('{"time":1,"msg":"hello"}\n');
+    await destination.close();
+  } finally {
+    process.stderr.write = write;
+  }
+  assert.ok(reported.some((line) => line.includes("Failed to publish logs to CloudWatch. Error: boom")));
 });
 
-test("cloudwatch destination surfaces create-log-stream failures for non-AWS-exists errors", async () => {
+test("cloudwatch destination reports log-stream failures instead of throwing", async () => {
   const client = {
     send: async (command) => {
       if (command instanceof CreateLogStreamCommand) {
@@ -1345,8 +1350,16 @@ test("cloudwatch destination surfaces create-log-stream failures for non-AWS-exi
     TEST_RUNTIME,
   );
 
-  destination.stream.write('{"time":1,"msg":"hello"}\n');
-  await assert.rejects(() => destination.close(), /stream-boom/);
+  const write = process.stderr.write;
+  const reported = [];
+  process.stderr.write = (text) => reported.push(String(text));
+  try {
+    destination.stream.write('{"time":1,"msg":"hello"}\n');
+    await destination.close();
+  } finally {
+    process.stderr.write = write;
+  }
+  assert.ok(reported.some((line) => line.includes("Failed to publish logs to CloudWatch. Error: stream-boom")));
 });
 
 test("cloudwatch destination supports daily monthly annual rotation and per-event rollover", async () => {
@@ -1634,4 +1647,116 @@ test("cloudwatch destination logs non-Error publish failures and caps retry dela
   } finally {
     process.stderr.write = originalWrite;
   }
+});
+
+function unreachable() {
+  return Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), { code: "ECONNREFUSED" });
+}
+
+async function quietly(run) {
+  const write = process.stderr.write;
+  const rejections = [];
+  const onRejection = (reason) => rejections.push(reason);
+  process.stderr.write = () => true;
+  process.on("unhandledRejection", onRejection);
+  try {
+    await run();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.stderr.write = write;
+    process.off("unhandledRejection", onRejection);
+  }
+  assert.deepEqual(rejections, []);
+}
+
+test("cloudwatch destination survives unreachable setup calls and publishes once aws recovers", async () => {
+  let reachable = false;
+  const published = [];
+  const client = {
+    send: async (command) => {
+      if (!reachable) throw unreachable();
+      if (command instanceof PutLogEventsCommand) published.push(...command.input.logEvents.map((event) => event.message));
+      return {};
+    },
+  };
+
+  await quietly(async () => {
+    const destination = createCloudWatchDestination(
+      { client, region: "af-south-1", logGroupName: "group", retentionInDays: 14, stream: { value: "stream" }, flushIntervalMs: 1, retryBaseDelayMs: 1 },
+      TEST_RUNTIME,
+    );
+    destination.stream.write('{"time":1,"msg":"while down"}\n');
+    await destination.flush();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.deepEqual(published, []);
+
+    reachable = true;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    await destination.close();
+  });
+
+  assert.deepEqual(published, ['{"time":1,"msg":"while down"}']);
+});
+
+test("cloudwatch destination recreates a log stream that disappeared", async () => {
+  const commands = [];
+  let missing = true;
+  const client = {
+    send: async (command) => {
+      commands.push(command.constructor.name);
+      if (command instanceof PutLogEventsCommand && missing) {
+        missing = false;
+        throw Object.assign(new Error("The specified log stream does not exist."), { name: "ResourceNotFoundException" });
+      }
+      return {};
+    },
+  };
+
+  await quietly(async () => {
+    const destination = createCloudWatchDestination(
+      { client, region: "af-south-1", logGroupName: "group", stream: { value: "stream" }, flushIntervalMs: 1, retryBaseDelayMs: 1 },
+      TEST_RUNTIME,
+    );
+    destination.stream.write('{"time":1,"msg":"hello"}\n');
+    await destination.flush();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await destination.close();
+  });
+
+  assert.equal(commands.filter((name) => name === "CreateLogStreamCommand").length, 2);
+  assert.equal(commands.filter((name) => name === "CreateLogGroupCommand").length, 2);
+  assert.equal(commands.at(-1), "PutLogEventsCommand");
+});
+
+test("cloudwatch destination keeps a failing background flush from escaping", async () => {
+  const write = process.stderr.write;
+  const reported = [];
+  const rejections = [];
+  const onRejection = (reason) => rejections.push(reason);
+  let failWrites = 1;
+  process.stderr.write = (text) => {
+    if (failWrites > 0) {
+      failWrites -= 1;
+      throw new Error("stderr closed");
+    }
+    reported.push(String(text));
+    return true;
+  };
+  process.on("unhandledRejection", onRejection);
+  try {
+    const destination = createCloudWatchDestination(
+      { client: { send: async () => { throw unreachable(); } }, region: "af-south-1", logGroupName: "group", stream: { value: "stream" }, flushIntervalMs: 1, retryBaseDelayMs: 60_000 },
+      TEST_RUNTIME,
+    );
+    destination.stream.write('{"time":1,"msg":"hello"}\n');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    process.stderr.write = () => true;
+    await destination.close();
+  } finally {
+    process.stderr.write = write;
+    process.off("unhandledRejection", onRejection);
+  }
+
+  assert.deepEqual(rejections, []);
+  assert.ok(reported.some((line) => line.includes("Failed to flush logs to CloudWatch.") && line.includes("stderr closed")));
 });
